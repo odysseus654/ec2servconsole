@@ -1,13 +1,10 @@
 <?xml version="1.0" ?>
-<!-- dialog.js
-	Displays modal dialog boxes
-	Depends on: dialog.css
+<!--	describeimages.xslt
+	User interface elements for the Images panel
 
 	Part of EC2 Server Console http://sourceforge.net/ec2servconsole
 
 	Copyright 2007-2008 Erik Anderson
-	Based on technique presented by Isaac Schlueter
-	at http://foohack.com/2007/11/css-modal-dialog-that-works-right/
 
 	Licensed under the Apache License, Version 2.0 (the "License");
 	you may not use this file except in compliance with the License.
