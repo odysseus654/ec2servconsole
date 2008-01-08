@@ -1,5 +1,25 @@
-// Displays modal dialog boxes
-// originally from http://foohack.com/tests/vertical-align/dialog.html
+/* dialog.js
+ * Displays modal dialog boxes
+ * Depends on: dialog.css
+ * 
+ * Part of EC2 Server Console http://sourceforge.net/ec2servconsole
+ * 
+ * Copyright 2007-2008 Erik Anderson
+ * Based on technique presented by Isaac Schlueter
+ * at http://foohack.com/2007/11/css-modal-dialog-that-works-right/
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 // Have to hack for Safari, due to poor support for the focus() function.
 var isSafari;

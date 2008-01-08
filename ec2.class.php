@@ -1,19 +1,28 @@
 <?php
-/**
- *  Amazon EC2 REST API Implementation
- *
- *  This a generic PHP class that can hook-in to Amazon's EC2 Elastic Compute Cloud
- *
- *  Based on the S3 REST API by Geoffrey P. Gaudreault (http://www.neurofuzzy.net)
- *  
- *  This code is free, provided AS-IS with no warranty expressed or implied.  Use at your own risk.
- *  If you find errors or bugs in this code, please contact me at interested@zanpo.com
- *  If you enhance this code in any way, please send me an update.  Thank you!
+/* ec2.class.php
+ * Amazon EC2 Query API Implementation
+ * 
+ * Part of EC2 Server Console http://sourceforge.net/ec2servconsole
+ * 
+ * Copyright 2007-2008 Erik Anderson
+ * Based on the S3 REST API by Geoffrey P. Gaudreault (http://www.neurofuzzy.net)
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  *	NOTE: ENTER YOUR API ID AND SECRET KEY BELOW!!!
+ *	NOTE: DON'T BE STUPID AND POST YOUR KEY PUBLICALLY, LIKE I AND AT LEAST ONE OTHER PERSON HAS
  *
- */ 
- 
+ */
 class ec2 {
 
 	// The API access point URL
@@ -25,9 +34,9 @@ class ec2 {
 	// -----------------------------------------
 	// -----------------------------------------
 	// your API key ID
-	var $keyId = "0YQPCGW08GR7K84XF7R2";
+	var $keyId = "00000000000000000000";
 	// your API Secret Key
-	var $secretKey = "lXA5IoWt+gXlQNolMdL1yfselpofrwfp/YmFAuLW";
+	var $secretKey = "0000000000000000000000000000000000000000";
 	// -----------------------------------------
 	// -----------------------------------------
 		
