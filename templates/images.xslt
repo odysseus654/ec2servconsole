@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-<!--	describeimages.xslt
+<!--	images.xslt
 	User interface elements for the Images panel
 
 	Part of EC2 Server Console http://sourceforge.net/ec2servconsole
@@ -23,30 +23,6 @@
 	<xsl:param name="sort" />
 	<xsl:param name="sortdir" />
 
-<!-- ....................................................................................... keyword elements -->
-
-	<xsl:template match="loading">
-		<div style="text-align: center; font: bold italic 25px sans-serif; color: gray" width="100%">
-			Loading...&#160;&#160;
-			<img src="images/spinner.gif" border="0" />
-		</div>
-	</xsl:template>
-
-	<xsl:template match="reloading">
-		<span style="text-align: center; font: bold italic 12px sans-serif; color: gray" width="100%">
-			Loading...&#160;&#160;
-			<img src="images/spinner.gif" border="0" />
-		</span>
-	</xsl:template>
-
-	<xsl:template match="failed">
-		<div style="text-align: center; font: bold 16px sans-serif; color: white; background-color: red" width="100%">
-			Loading failed
-		</div>
-	</xsl:template>
-
-<!-- ....................................................................................... common utilities -->
-
 	<xsl:template name="colSortHdr">
 		<xsl:param name="col" />
 		<xsl:param name="title" select="$col" />
@@ -66,8 +42,6 @@
 		</th>
 	</xsl:template>
 	
-<!-- ....................................................................................... DescribeImages -->
-
 	<xsl:template match="ec2:DescribeImagesResponse">
 		<xsl:apply-templates />
 	</xsl:template>

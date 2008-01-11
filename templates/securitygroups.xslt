@@ -36,8 +36,8 @@
 	</xsl:template>
 	
 	<xsl:template match="ec2:securityGroupInfo">
-		<table border="1" width="80%">
-			<tr>
+		<table class="securityGroups" width="80%">
+			<tr class="group">
 				<th>Name</th>
 				<th>Description</th>
 				<th></th>
@@ -47,7 +47,7 @@
 	</xsl:template>
 
 	<xsl:template match="ec2:item" mode="securityGroupInfo">
-		<tr class="securityGroup">
+		<tr class="group">
 			<td><b><xsl:value-of select="ec2:groupName" /></b></td>
 			<td><xsl:value-of select="ec2:groupDescription" /></td>
 			<td>
@@ -69,7 +69,7 @@
 	</xsl:template>
 
 	<xsl:template match="ec2:ipPermissions">
-		<table align="center" border="1" width="80%">
+		<table class="securityRule" align="center" border="1" width="80%">
 			<tr>
 				<th>protocol</th>
 				<th>from&#160;port</th>
@@ -136,14 +136,14 @@
 		<table align="center">
 			<tr>
 				<td align="right">From</td>
-				<td><input type="radio" name="type" value="ext" checked="yes" /> an external IP, or</td>
+				<td><input type="radio" name="type" value="ext" checked="yes" onclick="secCheckRuleGrp()" /> an external IP, or</td>
 			</tr>
 			<tr>
 				<td></td>
-				<td><input type="radio" name="type" value="int" /> another security group</td>
+				<td><input type="radio" name="type" value="int" onclick="secCheckRuleGrp()" /> another security group</td>
 			</tr>
 			<tr><td colspan="2"><hr /></td></tr>
-			<tr><td colspan="2">
+			<tr class="secExternal"><td colspan="2">
 				<form onsubmit="appSubmitAction(this,'addExtRule'); return false;"><table align="center">
 					<tr>
 						<td align="right">Protocol:</td>
@@ -173,16 +173,16 @@
 					</tr>
 				</table></form>
 			</td></tr>
-			<tr>
+			<tr class="secInternal">
 				<td align="right">From</td>
 				<td><input type="radio" name="src" value="me" checked="yes" /> a group that I own, or</td>
 			</tr>
-			<tr>
+			<tr class="secInternal">
 				<td></td>
 				<td><input type="radio" name="src" value="them" /> someone else's group</td>
 			</tr>
-			<tr><td colspan="2"><hr /></td></tr>
-			<tr><td colspan="2">
+			<tr class="secInternal"><td colspan="2"><hr /></td></tr>
+			<tr class="secInternalTheirs"><td colspan="2">
 				<form onsubmit="appSubmitAction(this,'addIntRule'); return false;"><table align="center">
 					<tr>
 						<td>Source group owner ID:</td>
@@ -200,7 +200,7 @@
 					</tr>
 				</table></form>
 			</td></tr>
-			<tr><td colspan="2">
+			<tr class="secInternalMine"><td colspan="2">
 				<form onsubmit="appSubmitAction(this,'addIntRule'); return false;"><table align="center">
 					<tr>
 						<td>Source group:</td>

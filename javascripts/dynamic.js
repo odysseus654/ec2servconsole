@@ -418,7 +418,7 @@ function TemplateQuery(url,handler)
 			if(typeof cacheVal == 'object' && cacheVal instanceof TemplateQuery)
 			{		// we have an in-progress query on this url, return that query object instead of ours
 				if(handler) cacheVal.setOnAvail(handler);
-				return this;
+				return cacheVal;
 			} else {	// we have previously queried and returned results, don't issue our own query
 				if(handler) this.setOnAvail(handler);
 				Promise.prototype.implSetValue.apply(this, [cacheVal]);
