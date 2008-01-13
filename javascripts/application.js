@@ -35,11 +35,10 @@ var PANELS = {
 	},
 	ec2_securityGroups: {
 		templ: 'securitygroups.xslt',
-		addAction: { label: 'Add Group', action: 'addGroup' },
-		defaults:  { panel: 'list' },
+		defaults:  { panel: 'list', add: 'addGroup' },
 		actions: {
 			list: { url: 'ec2.php', params: 'action=DescribeSecurityGroups', title: 'Available Security Groups' },
-			addGroup: { cmd: '<addGroup />', title: 'New Security Group' },
+			addGroup: { label: 'Add Group', cmd: '<addGroup />', title: 'New Security Group' },
 			addRule: { url: 'ec2.php', params: 'action=DescribeSecurityGroups', title: 'Add Rule to Security Group', templParms: {action: 'addRule'} }
 		},
 		submitActions: {
@@ -85,7 +84,6 @@ var ERRORS = {
 };
 
 var panelContext = {};
-var currentPanel = null;
 
 var CMD_CACHE = {};
 function retrieveTemplCommand(cmd,templ,handler)
@@ -186,23 +184,65 @@ function reXlateAndReplace(target, query, templParms)
 // Application-optimized functions, these attempt to retrieve the current context
 // from a DOM element somewhere in the parent of the element being focused on
 
-// Construct the pane with the specified action and optional parameter
-function appXlateAndReplace(panelName,action,param,panelTarget)
+function Panel(panelName, action, target)
 {
-	var panelDef = PANELS[panelName];
-	var contextId = action.context || panelName;
-	var templ = action.templ || panelDef.templ || APP_SCAFFOLD;
+	if(!panelName)
+	{
+		internalAppError('attempt to construct a panel with no name', 'Panel');
+		return null;
+	}
+	else if(typeof panelName == 'string')
+	{
+		this.name = panelName;
+		this.def = PANELS[this.name];
+		if(!this.def)
+		{
+			internalAppError('attempt to construct a panel with unknown name ' + panelName, 'Panel');
+			return null;
+		}
+	}
+	else
+	{
+		this.def = panelName;
+		this.name = this.def.name;
+	}
+	if(action.substr(0, 1) == '@')
+	{
+		action = this.def.defaults ? this.def.defaults[action.substr(1)] : null;
+	}
+	this.actionName = action;
+	this.action = this.def.actions[this.actionName]
+	if(!this.action)
+	{
+		internalAppError('attempt to construct panel ' + this.name + ' with unknown action ' + action, 'Panel');
+		return null;
+	}
+	this.target = target;
+	this.templ = this.action.templ || this.def.templ || APP_SCAFFOLD;
+	this.contextId = this.action.context || this.name;
+}
+Panel.prototype.name = null;
+Panel.prototype.def = null;
+Panel.prototype.contextId = null;
+Panel.prototype.actionName = null;
+Panel.prototype.action = null;
+Panel.prototype.query = null;
+Panel.prototype.templ = null;
+Panel.prototype.target = null;		// DOM reference, avoid circular references!
 
-	var ctx = contextId ? panelContext[contextId] : null;
+// Construct the pane with the specified action and optional parameter
+Panel.prototype.xlateAndReplace = function(param)
+{
+	var ctx = this.contextId ? panelContext[this.contextId] : null;
 	var req = {};
 
 	var key;
 	var ctxSerialize = '';
-	for(key in action)
+	for(key in this.action)
 	{
-		if(typeof action[key] == 'string')
+		if(typeof this.action[key] == 'string')
 		{
-			req[key] = action[key];
+			req[key] = this.action[key];
 		}
 	}
 	req.templParms = {};
@@ -216,11 +256,11 @@ function appXlateAndReplace(panelName,action,param,panelTarget)
 			ctxSerialize += encodeURIComponent(key) + '=' + encodeURIComponent(ctx[key]);
 		}
 	}
-	if(action.templParms)
+	if(this.action.templParms)
 	{
-		for(key in action.templParms)
+		for(key in this.action.templParms)
 		{
-			req.templParms[key] = action.templParms[key];
+			req.templParms[key] = this.action.templParms[key];
 		}
 	}
 	if(param)
@@ -232,25 +272,24 @@ function appXlateAndReplace(panelName,action,param,panelTarget)
 			req.params = param;
 		}
 	}
-	if(contextId && ctxSerialize)
+	if(this.contextId && ctxSerialize)
 	{
-		req.headers['X-App-Context'] = encodeURIComponent(contextId) + '/' + ctxSerialize;
+		req.headers['X-App-Context'] = encodeURIComponent(this.contextId) + '/' + ctxSerialize;
 	}
 
-	if(!panelTarget) panelTarget = document.getElementById('panel-target');
-	if(!panelTarget)
+	if(!this.target)
 	{
 		internalAppError('unable to locate panel-target in shell', 'appXlateAndReplace');
 		return null;
 	}
-	return xlateAndReplace(panelTarget, req, templ);
-}
+	this.query = xlateAndReplace(this.target, req, this.templ);
+	return this.query;
+};
 
 // Do it again, without any actual query this time
-function appRexlateAndReplace(panelName, query, action, panelTarget)
+Panel.prototype.rexlateAndReplace = function()
 {
-	var contextId = action.context || panelName;
-	var ctx = panelContext[contextId] || null;
+	var ctx = panelContext[this.contextId] || null;
 	var templ = {};
 
 	var key;
@@ -261,136 +300,54 @@ function appRexlateAndReplace(panelName, query, action, panelTarget)
 			templ[key] = ctx[key];
 		}
 	}
-	if(action.templParms)
+	if(this.action.templParms)
 	{
-		for(key in action.templParms)
+		for(key in this.action.templParms)
 		{
-			templ[key] = action.templParms[key];
+			templ[key] = this.action.templParms[key];
 		}
 	}
 
-	if(!panelTarget) panelTarget = document.getElementById('panel-target');
-	if(!panelTarget)
+	if(!this.target)
 	{
 		internalAppError('unable to locate panel-target in shell', 'appRexlateAndReplace');
 	}
-	else if(!reXlateAndReplace(panelTarget, query, templ))
+	else if(!reXlateAndReplace(this.target, this.query, templ))
 	{
 		internalAppError('unable to re-render translation', 'appRexlateAndReplace');
 	}
-}
-
-// Check for any blocks, cancel any in-progress requests and prepare for this app to shut down
-function appClosePanel(panelName)
-{
-	return true;
-}
-
-// Set the active application pane to the specified panelName and optional action
-function appSetPanel(panelName,action)
-{
-	if(!panelName || !PANELS[panelName])
-	{
-		internalAppError('attempt to activate invalid or missing panel ' + panelName, 'appSetPanel');
-		return;
-	}
-	if(panelName != currentPanel)
-	{
-		if(!appClosePanel(currentPanel)) return;
-	}
-	var panelDef = PANELS[panelName];
-	if(!action && panelDef.defaults) action = panelDef.defaults.panel;
-	if(!action || !panelDef.actions[action])
-	{
-		internalAppError('attempt to activate panel ' + panelName + ' with invalid or missing action ' + action, 'appSetPanel');
-		return;
-	}
-	var actionDef = panelDef.actions[action];
-	var titleObj = document.getElementById('panel-title');
-	if(titleObj)
-	{
-		Sarissa.clearChildNodes(titleObj);
-		titleObj.appendChild(document.createTextNode(actionDef.title));
-	}
-	var addObj = document.getElementById('panel-add');
-	if(addObj)
-	{
-		Sarissa.clearChildNodes(addObj);
-		if(panelDef.addAction)
-		{
-			var wrapObj = document.createElement('A');
-			addObj.appendChild(wrapObj);
-			wrapObj.appendChild(document.createTextNode(panelDef.addAction.label));
-			if(panelDef.addAction.action)
-			{
-				wrapObj.onclick = function() { appPopupAction(panelDef.addAction.action); };
-			}
-		}
-	}
-	var query = appXlateAndReplace(panelName,actionDef);
-	currentPanel = { name: panelName, action: action, query: query };
-}
-
-// Create a popup dialog with the contents of the specified action
-function appPopupAction(action, panelName, param)
-{
-	if(!panelName && currentPanel) panelName = currentPanel.name;
-	if(!panelName || !PANELS[panelName])
-	{
-		internalAppError('attempt to open popup with invalid or missing panel context ' + panelName, 'appPopupAction');
-		return;
-	}
-	var panelDef = PANELS[panelName];
-	if(!action || !panelDef.actions[action])
-	{
-		internalAppError('attempt to open popup in panel ' + panelName + ' with invalid or missing action ' + action, 'appPopupAction');
-		return;
-	}
-	var actionDef = panelDef.actions[action];
-
-	var popup = new DialogWindow(null, actionDef.title);
-	popup.create();
-	popup.show();
-	appXlateAndReplace(panelName, actionDef, param, popup.wrapper.inner);
-}
+};
 
 // called from a sortable TH element, examine the className to determine whether sorting is currently in progress on this element
-function panelSort(thElem, sort)
+Panel.prototype.sort = function(thElem, sort)
 {
-	if(!currentPanel || !currentPanel.query || !currentPanel.query.isComplete)
+	if(!this.query || !this.query.isComplete)
 	{
 		internalAppError('attempt to sort with a nonexistant or non-rendable query', 'panelSort');
 		return;
 	}
 	var sortdir = (thElem.className == 'sortup') ? 'd' : 'u';
-
-	var panelDef = PANELS[currentPanel.name];
-	var actionDef = panelDef.actions[currentPanel.action];
-	var contextId = actionDef.context || currentPanel.name;
-
-	if(!panelContext[contextId]) panelContext[contextId] = {};
-	var ctx = panelContext[contextId];
+	if(!panelContext[this.contextId]) panelContext[this.contextId] = {};
+	var ctx = panelContext[this.contextId];
 	ctx.sort = sort;
 	ctx.sortdir = sortdir;
 
-	appRexlateAndReplace(currentPanel.name, currentPanel.query, actionDef);
+	this.rexlateAndReplace();
 }
 
 // Refresh the current pane with fresh data
-function appRefreshPanel()
+Panel.prototype.refresh = function()
 {
-	if(!currentPanel)
-	{
-		internalAppError('attempt to refresh a nonexistant panel', 'appRefreshPanel');
-		return;
-	}
-
-	var panelDef = PANELS[currentPanel.name];
-	var actionDef = panelDef.actions[currentPanel.action];
-	currentPanel.query = appXlateAndReplace(currentPanel.name,actionDef);
+	this.query = this.xlateAndReplace();
 }
 
-function appHandleResponse(url, panelDef, xmlhttp)
+// Check for any blocks, cancel any in-progress requests and prepare for this app to shut down
+Panel.prototype.close = function()
+{
+	return true;
+};
+
+Panel.prototype.handleResponse = function(url, xmlhttp)
 {
 	if(xmlhttp.status != 200)
 	{
@@ -434,9 +391,9 @@ function appHandleResponse(url, panelDef, xmlhttp)
 		var code = result.Response.Errors.Error.Code['_body'];
 		var msg = result.Response.Errors.Error.Message['_body'];
 		var descr;
-		if(panelDef && panelDef.errors && panelDef.errors[code])
+		if(this.def.errors && this.def.errors[code])
 		{
-			descr = panelDef.errors[code];
+			descr = this.def.errors[code];
 		}
 		else if(ERRORS[code])
 		{
@@ -485,73 +442,222 @@ function appHandleResponse(url, panelDef, xmlhttp)
 	return false;
 }
 
-function appSubmitActionImpl(actionDef, panelDef, panelName, formElem, content)
+Panel.prototype.submitAction = function(actionDef, content, formElem, callback)
 {
+	var self = this;
 	new AjaxQuery({url: actionDef.url, method: 'post', params: content}, function(xmlhttp)
 	{
 		if(!xmlhttp)
 		{
 			internalAppError('an unexpected error occurred submitting form data', 'appSubmitActionImpl');
 		}
-		else if(appHandleResponse(actionDef.url, panelDef, xmlhttp))
+		else if(self.handleResponse(actionDef.url, xmlhttp))
 		{
-			var modal = ModalWindow.activeWindow(formElem);
-			if(modal) modal.destroy();
+			if(callback) callback(xmlhttp);
 			if(actionDef.nextAction)
 			{
-				appSetPanel(actionDef.nextPane || panelName, actionDef.nextAction);
+				new AppPane(actionDef.nextPane || self.name, actionDef.nextAction);
 			} else {
 				appRefreshPanel();
 			}
 		}
 	});
-}
+};
 
-function appSubmitAction(formElem, action, panelName)
+Panel.prototype.submitFormAction = function(submitAction, formElem)
 {
-	if(!panelName && currentPanel) panelName = currentPanel.name;
-	if(!panelName || !PANELS[panelName])
+	if(!submitAction || !this.submitActions[submitAction])
 	{
-		internalAppError('attempt to submit a form with invalid or missing panel context ' + panelName, 'appSubmitAction');
+		internalAppError('attempt to submit a form in panel ' + this.name + ' with invalid or missing action ' + submitAction, 'appSubmitAction');
 		return;
 	}
-	var panelDef = PANELS[panelName];
-	if(!action || !panelDef.submitActions[action])
-	{
-		internalAppError('attempt to submit a form in panel ' + panelName + ' with invalid or missing action ' + action, 'appSubmitAction');
-		return;
-	}
-	var actionDef = panelDef.submitActions[action];
+	var actionDef = this.submitActions[action];
 	var content = Sarissa.formToQueryString(formElem);
 	if(actionDef.params) content = actionDef.params + '&' + content;
+
+	return this.submitAction(actionDef, content, formElem);
+};
+
+Panel.prototype.delete = function(src, descr, id, delAction)
+{
+	if(!delAction) action = 'delete';
+	if(!this.def.submitActions[delAction])
+	{
+		internalAppError('attempt to issue a delete action panel ' + this.name + ' with invalid or missing action ' + delAction, 'appDelete');
+		return;
+	}
+	var actionDef = this.def.submitActions[delAction];
+
+	var msg = 'Are you sure you wish to delete this ' + (actionDef.title || 'item') + ' ' + descr + '?';
+	if(confirm(msg))
+	{
+		this.submitAction(actionDef, actionDef.params + id, src);
+	}
+};
+
+// ----------------------------------------------------------------------------
+// Represents an application pane
+var currentAppPane = null;
+function AppPane(panelName, action)
+{
+	if(!action) action = '@panel';
+	var hasError = Panel.apply(this, [panelName, action, document.getElementById('panel-target')]) === null;
+	if(hasError) return null;
+
+	if(currentAppPane && currentAppPane !== this) // not sure how it could, but i guess check anyhow
+	{
+		if(!currentAppPane.close()) return null;	// not ready to transition yet, close() should throw the error or explanation
+	}
+	currentAppPane = this;
+
+	var titleObj = document.getElementById('panel-title');
+	if(titleObj)
+	{
+		Sarissa.clearChildNodes(titleObj);
+		titleObj.appendChild(document.createTextNode(this.action.title));
+	}
+
+	var addObj = document.getElementById('panel-add');
+	if(addObj)
+	{
+		Sarissa.clearChildNodes(addObj);
+		if(this.def.defaults && this.def.defaults.add)
+		{
+			var addAction = this.def.actions[this.def.defaults.add];
+			var wrapObj = document.createElement('A');
+			addObj.appendChild(wrapObj);
+			wrapObj.appendChild(document.createTextNode(addAction.label || addAction.title));
+			var self = this;
+			wrapObj.onclick = this.createClickAction(this.def.defaults.add);
+		}
+	}
+}
+subclass(AppPane, Panel);
+
+AppPane.prototype.createClickAction = function(action)
+{
+	// seperated out from the main body to help prevent circular references
+	var name = this.def;
+	return function() { appPopupAction(action, name); };
+};
+
+// ----------------------------------------------------------------------------
+// Create a popup dialog with the contents of the specified action
+function PopupPanel(panelName, action)
+{
+	var hasError = Panel.apply(this, [panelName, action]) === null;
+	if(hasError) return null;
+
+	var popup = new DialogWindow(null, this.action.title);
+	popup.popupPanel = this;		// let's just sneak this in here, the only DOM reference we make is also one it makes as well
+	popup.create();
+	popup.show();
+	this.target = popup.wrapper.inner;
+}
+subclass(PopupPanel, Panel);
+
+PopupPanel.prototype.submitFormAction = function(submitAction, formElem)
+{
+	if(!submitAction || !this.def.submitActions[submitAction])
+	{
+		internalAppError('attempt to submit a form in panel ' + this.name + ' with invalid or missing action ' + submitAction, 'appSubmitAction');
+		return;
+	}
+	var actionDef = this.def.submitActions[submitAction];
+	var content = Sarissa.formToQueryString(formElem);
+	if(actionDef.params) content = actionDef.params + '&' + content;
+
+	return this.submitAction(actionDef, content, formElem, function()
+	{
+		var modal = ModalWindow.activeWindow(formElem);
+		if(modal) modal.destroy();
+	});
+};
+
+// Given a dialog-based pane and an element inside that pane, locate the object representing that pane
+PopupPanel.activePanel = function(srcElem)
+{
+	var dialog = srcElem ? ModalWindow.activeWindow(srcElem) : null;
+	return (dialog ? dialog.popupPanel : null) || currentAppPane;
+};
+
+// ----------------------------------------------------------------------------
+
+// Set the active application pane to the specified panelName and optional action
+function appSetPanel(panelName,action)
+{
+	if(currentAppPane)
+	{
+		if((currentAppPane.name == panelName || currentAppPane.def === panelName) && currentAppPanel.actionName == action)
+		{
+			// no change, just return
+			return currentAppPane;
+		}
+	}
+	var pane = new AppPane(panelName, action);
+	if(pane)
+	{
+		pane.xlateAndReplace();
+	}
+}
+
+function appPopupAction(action, panelName, param)
+{
+	var pane = new PopupPanel(panelName || (currentAppPane ? currentAppPane.def : null), action);
+	if(pane)
+	{
+		pane.xlateAndReplace(param);
+	}
+}
+
+// called from a sortable TH element, examine the className to determine whether sorting is currently in progress on this element
+function panelSort(thElem, sort)
+{
+	var pane = PopupPanel.activePanel(thElem);
+	if(!pane)
+	{
+		internalAppError('attempt to sort with a nonexistant panel', 'panelSort');
+		return;
+	}
+	pane.sort(thElem, sort);
+}
+
+// Refresh the current pane with fresh data
+function appRefreshPanel(srcElem)
+{
+	var pane = PopupPanel.activePanel(srcElem);
+	if(!pane)
+	{
+		internalAppError('attempt to refresh a nonexistant panel', 'appRefreshPanel');
+		return;
+	}
+	pane.refresh();
+}
+
+function appSubmitAction(formElem, action)
+{
+	var pane = PopupPanel.activePanel(formElem);
+	if(!pane)
+	{
+		internalAppError('attempt to submit a nonexistant panel', 'appSubmitAction');
+		return;
+	}
 
 	// firefox seems to really not like an XMLHTTP action inside of an onsubmit action, so let's break it out
 	window.setTimeout(function()
 	{
-		appSubmitActionImpl(actionDef, panelDef, panelName, formElem, content);
+		pane.submitFormAction(action, formElem);
 	}, 0);
 }
 
 function appDelete(src, descr, id, action, panelName)
 {
-	if(!panelName && currentPanel) panelName = currentPanel.name;
-	if(!action) action = 'delete';
-	if(!panelName || !PANELS[panelName])
+	var pane = PopupPanel.activePanel(src);
+	if(!pane)
 	{
-		internalAppError('attempt to issue a delete action with invalid or missing panel context ' + panelName, 'appDelete');
+		internalAppError('attempt to delete using a nonexistant panel', 'appDelete');
 		return;
 	}
-	var panelDef = PANELS[panelName];
-	if(!action || !panelDef.submitActions[action])
-	{
-		internalAppError('attempt to issue a delete action panel ' + panelName + ' with invalid or missing action ' + action, 'appDelete');
-		return;
-	}
-	var actionDef = panelDef.submitActions[action];
-
-	var msg = 'Are you sure you wish to delete this ' + (actionDef.title || 'item') + ' ' + descr + '?';
-	if(confirm(msg))
-	{
-		appSubmitActionImpl(actionDef, panelDef, panelName, src, actionDef.params + id);
-	}
+	
+	return pane.delete(src, descr, id, action);
 }

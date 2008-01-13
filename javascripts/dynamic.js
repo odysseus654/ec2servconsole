@@ -19,6 +19,21 @@
  * limitations under the License.
  */
 
+// This function can be used to declare JavaScript constructors with nuances that the normal
+// prototype-based methodology does not provide for.  Among other things, constructors no longer
+// need to handle the empty construction to permit subclassing
+// Described at http://www.golimojo.com/etc/js-subclass.html
+function subclass(constructor, superConstructor)
+{
+	function SurrogateConstructor() {}
+	SurrogateConstructor.prototype = superConstructor.prototype;
+
+	var prototypeObject = new SurrogateConstructor();
+	prototypeObject.constructor = constructor;
+
+	constructor.prototype = prototypeObject;
+}
+
 function anonymousPopup(body)
 {
 	var popup = window.open('about:blank', '_blank');
@@ -136,7 +151,7 @@ function CompositePromise()		// pass list of promises here
 		this.addPromise(arguments);
 	}
 }
-CompositePromise.prototype = new Promise();
+subclass(CompositePromise, Promise);
 CompositePromise.prototype.members = null;
 CompositePromise.prototype.value = false;
 CompositePromise.prototype.pendingPromise = 0;
@@ -200,63 +215,68 @@ CompositePromise.prototype.abort = function()
 function AjaxQuery(req,handler)
 {
 	Promise.apply(this);
-	if(req)
+	if(handler) this.setOnAvail(handler);
+
+	var self = this;
+	this.xmlhttp = new XMLHttpRequest();
+	
+	this.xmlhttp.onreadystatechange = function()
 	{
-		if(handler) this.setOnAvail(handler);
-
-		var self = this;
-		this.xmlhttp = new XMLHttpRequest();
-		
-		this.xmlhttp.onreadystatechange = function()
+		if(!self.xmlhttp)
 		{
-			if(!self.xmlhttp)
-			{
-				self.implSetValue(null);
-			}
-			else if(self.xmlhttp.readyState == 4)
-			{
-				self.implSetValue(self.xmlhttp);
-			}
-		};
-		
-		var method, params, url;
-		params = req.params;
-		url = req.url;
-		if(req.method && req.method.toLowerCase() == 'post')
-		{
-			method = 'POST';
-			if(!params) params = '';
-		} else {
-			method = 'GET';
-			if(params) url += '?' + params;
-			params = '';
+			self.implSetValue(null);
 		}
-		this.xmlhttp.open(method, url, true);
-
-		if(req.headers)
+		else if(self.xmlhttp.readyState == 4)
 		{
-			var key;
-			for(key in req.headers)
-			{
-				this.xmlhttp.setRequestHeader(key, req.headers[key]);
-			}
+			self.implSetValue(self.xmlhttp);
 		}
-
-		this.xmlhttp.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-		this.xmlhttp.setRequestHeader('X-Ajax-Engine', 'Sarissa/' + Sarissa.VERSION);
-		this.xmlhttp.setRequestHeader('Content-length', params.length);
-		
-		if(method == 'POST')
-		{
-			this.xmlhttp.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-			this.xmlhttp.setRequestHeader('Connection', 'close');
-		} else {
-			this.xmlhttp.setRequestHeader('If-Modified-Since', 'Sat, 1 Jan 2000 00:00:00 GMT');
-		}
-		this.xmlhttp.send(params);
+	};
+	
+	var method, params, url;
+	params = req.params;
+	url = req.url;
+	if(req.method && req.method.toLowerCase() == 'post')
+	{
+		method = 'POST';
+		if(!params) params = '';
+	} else {
+		method = 'GET';
+		if(params) url += '?' + params;
+		params = '';
 	}
+	try {
+		this.xmlhttp.open(method, url, true);
+	}
+	catch(e)
+	{
+		internalAppError('Unexpected error opening connection to ' + url + ': ' + e.message, 'AjazQuery');
+		this.implSetValue(null);
+		return;
+	}
+
+	if(req.headers)
+	{
+		var key;
+		for(key in req.headers)
+		{
+			this.xmlhttp.setRequestHeader(key, req.headers[key]);
+		}
+	}
+
+	this.xmlhttp.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+	this.xmlhttp.setRequestHeader('X-Ajax-Engine', 'Sarissa/' + Sarissa.VERSION);
+	this.xmlhttp.setRequestHeader('Content-length', params.length);
+	
+	if(method == 'POST')
+	{
+		this.xmlhttp.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+		this.xmlhttp.setRequestHeader('Connection', 'close');
+	} else {
+		this.xmlhttp.setRequestHeader('If-Modified-Since', 'Sat, 1 Jan 2000 00:00:00 GMT');
+	}
+	this.xmlhttp.send(params);
 }
-AjaxQuery.prototype = new Promise();
+subclass(AjaxQuery, Promise);
 AjaxQuery.prototype.xmlhttp = null;
 
 AjaxQuery.prototype.cleanup = function()
@@ -296,19 +316,16 @@ AjaxQuery.prototype.abort = function()
 function XmlAjaxQuery(req,handler)
 {
 	Promise.apply(this);
-	if(req)
-	{
-		if(handler) this.setOnAvail(handler);
+	if(handler) this.setOnAvail(handler);
 
-		var self = this;
-		this.url = req.url;
-		this.xmlhttp = new AjaxQuery(req,function(xmlhttp)
-		{
-			self.onLoaded(xmlhttp);
-		});
-	}
+	var self = this;
+	this.url = req.url;
+	this.xmlhttp = new AjaxQuery(req,function(xmlhttp)
+	{
+		self.onLoaded(xmlhttp);
+	});
 }
-XmlAjaxQuery.prototype = new Promise();
+subclass(XmlAjaxQuery, Promise);
 XmlAjaxQuery.prototype.xmlhttp = null;
 XmlAjaxQuery.prototype.url = null;
 
@@ -373,28 +390,25 @@ XmlAjaxQuery.prototype.cleanup = function()
 var XML_CACHE = {};
 function CachedXmlAjaxQuery(url,handler)
 {
-	if(url)
+	this.url = url;
+	var cacheVal = XML_CACHE[url];
+	if(cacheVal)
 	{
-		this.url = url;
-		var cacheVal = XML_CACHE[url];
-		if(cacheVal)
-		{
-			if(typeof cacheVal == 'object' && cacheVal instanceof CachedXmlAjaxQuery)
-			{		// we have an in-progress query on this url, return that object instead of us
-				if(handler) cacheVal.setOnAvail(handler);
-				return cacheVal;
-			} else {	// we have previously queried and returned results, don't issue our own query
-				Promise.apply(this);
-				if(handler) this.setOnAvail(handler);
-				Promise.prototype.implSetValue.apply(this, [XML_CACHE[url]]);
-			}
-		} else {		// we are now the active query for this url
-			XML_CACHE[url] = this;
-			XmlAjaxQuery.apply(this, [{url: url, method: 'GET'}, handler]);
+		if(typeof cacheVal == 'object' && cacheVal instanceof CachedXmlAjaxQuery)
+		{		// we have an in-progress query on this url, return that object instead of us
+			if(handler) cacheVal.setOnAvail(handler);
+			return cacheVal;
+		} else {	// we have previously queried and returned results, don't issue our own query
+			Promise.apply(this);
+			if(handler) this.setOnAvail(handler);
+			Promise.prototype.implSetValue.apply(this, [XML_CACHE[url]]);
 		}
+	} else {		// we are now the active query for this url
+		XML_CACHE[url] = this;
+		XmlAjaxQuery.apply(this, [{url: url, method: 'GET'}, handler]);
 	}
 }
-CachedXmlAjaxQuery.prototype = new XmlAjaxQuery();
+subclass(CachedXmlAjaxQuery, XmlAjaxQuery);
 
 CachedXmlAjaxQuery.prototype.implSetValue = function(val)
 {
@@ -409,32 +423,29 @@ var XSLT_CACHE = {};
 function TemplateQuery(url,handler)
 {
 	Promise.apply(this);
-	if(url)
+	this.url = url;
+	var cacheVal = XSLT_CACHE[url];
+	if(cacheVal)
 	{
-		this.url = url;
-		var cacheVal = XSLT_CACHE[url];
-		if(cacheVal)
-		{
-			if(typeof cacheVal == 'object' && cacheVal instanceof TemplateQuery)
-			{		// we have an in-progress query on this url, return that query object instead of ours
-				if(handler) cacheVal.setOnAvail(handler);
-				return cacheVal;
-			} else {	// we have previously queried and returned results, don't issue our own query
-				if(handler) this.setOnAvail(handler);
-				Promise.prototype.implSetValue.apply(this, [cacheVal]);
-			}
-		} else {		// we are now the active query for this url
-			var self = this;
-			XSLT_CACHE[url] = this;
+		if(typeof cacheVal == 'object' && cacheVal instanceof TemplateQuery)
+		{		// we have an in-progress query on this url, return that query object instead of ours
+			if(handler) cacheVal.setOnAvail(handler);
+			return cacheVal;
+		} else {	// we have previously queried and returned results, don't issue our own query
 			if(handler) this.setOnAvail(handler);
-			this.xmlSource = new CachedXmlAjaxQuery(url,function(xml)
-			{
-				self.onLoaded(xml);
-			});
+			Promise.prototype.implSetValue.apply(this, [cacheVal]);
 		}
+	} else {		// we are now the active query for this url
+		var self = this;
+		XSLT_CACHE[url] = this;
+		if(handler) this.setOnAvail(handler);
+		this.xmlSource = new CachedXmlAjaxQuery(url,function(xml)
+		{
+			self.onLoaded(xml);
+		});
 	}
 }
-TemplateQuery.prototype = new Promise();
+subclass(TemplateQuery, Promise);
 TemplateQuery.prototype.xmlSource = null;
 TemplateQuery.prototype.url = null;
 
@@ -503,18 +514,15 @@ TemplateQuery.transform = function(xslt, xml, parms)
 function TransformedAjaxCommand(xslt, xml, handler)
 {
 	Promise.apply(this);
-	if(xslt)
-	{
-		if(handler) this.setOnAvail(handler);
+	if(handler) this.setOnAvail(handler);
 
-		var self = this;
-		this.xsltSource = new TemplateQuery(xslt, function(xslt)
-		{
-			self.onLoaded(xslt, xml);
-		});
-	}
+	var self = this;
+	this.xsltSource = new TemplateQuery(xslt, function(xslt)
+	{
+		self.onLoaded(xslt, xml);
+	});
 }
-TransformedAjaxCommand.prototype = new Promise();
+subclass(TransformedAjaxCommand, Promise);
 TransformedAjaxCommand.prototype.xslt = null;
 TransformedAjaxCommand.prototype.xsltSource = null;
 
@@ -559,30 +567,27 @@ TransformedAjaxCommand.prototype.cleanup = function()
 function TransformedAjaxQuery(xslt, req, handler)
 {
 	Promise.apply(this);
-	if(xslt && req)
-	{
-		if(handler) this.setOnAvail(handler);
+	if(handler) this.setOnAvail(handler);
 
-		this.templParms = req.templParms;
-		var self = this;
-		this.xsltSource = new TemplateQuery(xslt, function(xslt)
-		{
-			self.xslt = xslt;
-		});
-		
-		this.xmlSource = new XmlAjaxQuery(req, function(xml)
-		{
-			self.xml = xml;
-		});
-		
-		this.compSource = new CompositePromise(this.xsltSource, this.xmlSource);
-		this.compSource.setOnAvail(function()
-		{
-			self.onLoaded();
-		});
-	}
+	this.templParms = req.templParms;
+	var self = this;
+	this.xsltSource = new TemplateQuery(xslt, function(xslt)
+	{
+		self.xslt = xslt;
+	});
+	
+	this.xmlSource = new XmlAjaxQuery(req, function(xml)
+	{
+		self.xml = xml;
+	});
+	
+	this.compSource = new CompositePromise(this.xsltSource, this.xmlSource);
+	this.compSource.setOnAvail(function()
+	{
+		self.onLoaded();
+	});
 }
-TransformedAjaxQuery.prototype = new Promise();
+subclass(TransformedAjaxQuery, Promise);
 TransformedAjaxQuery.prototype.xml = null;
 TransformedAjaxQuery.prototype.xslt = null;
 TransformedAjaxQuery.prototype.xmlSource = null;
