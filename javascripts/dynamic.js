@@ -607,7 +607,7 @@ TransformedAjaxQuery.prototype.onLoaded = function()
 
 TransformedAjaxQuery.prototype.rerender = function()
 {
-	if(!this.xml || !this.xslt) return null
+	if(!this.xml || !this.xslt) return null;
 	return TemplateQuery.transform(this.xslt, this.xml, this.templParms);
 };
 
@@ -633,7 +633,7 @@ TransformedAjaxQuery.prototype.cleanup = function()
 // -----------------------------------------------------------------------------------------------------
 // XMLtoJS - utility function to attempt to translate an XML document into a JS object
 
-function XMLtoJS(node)
+function xmlToJS(node)
 {
 	if(node.nodeType == Node.COMMENT_NODE || node.nodeType == Node.PROCESSING_INSTRUCTION_NODE)
 	{
@@ -653,7 +653,7 @@ function XMLtoJS(node)
 	{
 		for(idx=0; idx < node.attributes.length; idx++)
 		{
-			var attr = node.attributes.item(idx)
+			var attr = node.attributes.item(idx);
 			thisObj['@' + attr.nodeName] = attr.nodeValue;
 		}
 	}
@@ -663,7 +663,7 @@ function XMLtoJS(node)
 		for(idx=0; idx < node.childNodes.length; idx++)
 		{
 			var child = node.childNodes[idx];
-			var childVal = XMLtoJS(child);
+			var childVal = xmlToJS(child);
 			if(typeof childVal == 'string')
 			{
 				bodyText += childVal;
@@ -677,7 +677,7 @@ function XMLtoJS(node)
 
 	if(bodyText)
 	{
-		thisObj['_body'] = bodyText;
+		thisObj._body = bodyText;
 	}
 
 	return thisObj;

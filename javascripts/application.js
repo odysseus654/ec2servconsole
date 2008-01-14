@@ -36,14 +36,18 @@ var PANELS = {
 	ec2_securityGroups: {
 		templ: 'securitygroups.xslt',
 		defaults:  { panel: 'list', add: 'addGroup' },
+		exclusionStyles: { intMine: ['secInternal', 'secInternalMine'], intTheirs: ['secInternal', 'secInternalTheirs'], ext: ['secExternal'] },
 		actions: {
 			list: { url: 'ec2.php', params: 'action=DescribeSecurityGroups', title: 'Available Security Groups' },
 			addGroup: { label: 'Add Group', cmd: '<addGroup />', title: 'New Security Group' },
-			addRule: { url: 'ec2.php', params: 'action=DescribeSecurityGroups', title: 'Add Rule to Security Group', templParms: {action: 'addRule'} }
+			addRule: {
+				url: 'ec2.php', params: 'action=DescribeSecurityGroups', title: 'Add Rule to Security Group', templParms: {action: 'addRule'},
+				onInject: secCheckRuleGrp
+			}
 		},
 		submitActions: {
 			addGroup: { url: 'ec2.php', params: 'action=CreateSecurityGroup' },
-			deleteGroup: { title: 'security group', url: 'ec2.php', params: 'action=DeleteSecurityGroup&id=' }
+			deleteGroup: { label: 'security group', url: 'ec2.php', params: 'action=DeleteSecurityGroup&id=' }
 		}
 	}
 };
@@ -83,8 +87,6 @@ var ERRORS = {
 	'Unavailable':					'The AWS system is overloaded or otherwise unavailable.  Please try again later'
 };
 
-var panelContext = {};
-
 var CMD_CACHE = {};
 function retrieveTemplCommand(cmd,templ,handler)
 {
@@ -120,7 +122,7 @@ function retrieveTemplCommand(cmd,templ,handler)
 	}
 }
 
-function xlateAndReplace(target, req, templ)
+function xlateAndReplace(target, req, templ, callback)
 {
 	function catchResults(result)
 	{
@@ -128,6 +130,7 @@ function xlateAndReplace(target, req, templ)
 		if(result && (result.nodeType != Node.DOCUMENT_FRAGMENT_NODE || result.childNodes.length))
 		{
 			target.appendChild(result);
+			if(callback) callback(true);
 		}
 		else retrieveTemplCommand(CMD_FAILMSG, null, function(result)
 		{
@@ -135,6 +138,7 @@ function xlateAndReplace(target, req, templ)
 			{
 				target.appendChild(result);
 			}
+			if(callback) callback(false);
 		});
 	}
 
@@ -150,6 +154,7 @@ function xlateAndReplace(target, req, templ)
 	else
 	{
 		internalAppError('a translate/replace query was submitted with no url and no cmd, what am i expected to do?', 'xlateAndReplace');
+		if(callback) callback(false);
 	}
 	if(query && !query.isComplete)
 	{
@@ -163,6 +168,116 @@ function xlateAndReplace(target, req, templ)
 		});
 	}
 	return query;
+}
+
+// This function has been through a few development iterations.  One often-required feature of complex forms is the ability to show/hide
+// sections of the form dynamically based on conditions elsewhere in the form.  The normal way to do this is to set class names on the
+// appropriate section and programatically suppress those classes.  This requires a <style> tag in the HEAD tag for each potential ruleset.
+// IE for various reasons will not permit STYLE elements to be transformed out of the XSLT files (and appears to require that they be
+// constructed using DOM methods) and I'm not willing to place every potential ruleset for every pane in index.html, so this function
+// attempts to simplify the problem and handle the DOM aspects as well.
+//
+// Arguments:
+//   exclDesc - definition of the rulesets to maintain, taken from PANELS.*.exclusionStyles.
+//              A hash of every valid exclusion rule mapped to an array of the CSS classnames to *display* (all other classnames mentioned
+//              in other rules will be suppressed)
+//   newExcl  - the exclusion rule to show.  If empty or nonmatching, then all classes are suppressed
+var AVAIL_EXCLUSIONS = {};
+function buildClassExclusion(exclDesc)
+{
+	function buildExclusionImpl(descMap)
+	{
+		var supMap = {};		// set of all classes mentioned in this map
+		var supArray = [];		// array of all classes mentioned in this map
+		var exclList = [];		// array of exclusion codes in this map
+		var key, idx;
+		
+		// investigate and build up our support structure
+		for(key in descMap)
+		{
+			exclList.push(key);
+			var thisExcl = descMap[key];
+			for(idx=0; idx < thisExcl.length; idx++)
+			{
+				if(!supMap[thisExcl[idx]])
+				{
+					supMap[thisExcl[idx]] = true;
+					supArray.push(thisExcl[idx]);
+				}
+			}
+		}
+		
+		// now go through and create the stylesheets
+		for(key in descMap)
+		{
+			if(!AVAIL_EXCLUSIONS[key])
+			{
+				var thisExcl = descMap[key];
+				
+				// create the base stylesheets
+				var sheet = new CSSStyleSheet();
+				var node = sheet.sheet || sheet.styleElement;
+				node.disabled = true;
+				
+				// build a map of the classes in this rule
+				var thisExclMap = {};
+				for(idx=0; idx < thisExcl.length; idx++)
+				{
+					thisExclMap[thisExcl[idx]] = true;
+				}
+				
+				// now add every element not in the exclusion map
+				for(idx=0; idx < supArray.length; idx++)
+				{
+					if(!thisExclMap[supArray[idx]])
+					{
+						sheet.addRule('.' + supArray[idx], 'display: none');
+					}
+				}
+				AVAIL_EXCLUSIONS[key] = { sheet: sheet, exc: exclList };
+			}
+		}
+	}
+	
+	// wipe all the previous stylesheets
+	for(var key in AVAIL_EXCLUSIONS)
+	{
+		var sheet = AVAIL_EXCLUSIONS[key].sheet;
+		var node = sheet.styleElement || sheet.sheet.owningElement;
+		node.parentNode.removeChild(node);
+	}
+	AVAIL_EXCLUSIONS = {};
+
+	// it's an array, so let's build each of the elements inside of it
+	if(Array.prototype.isPrototypeOf(exclDesc))
+	{
+		for(var idx=0; idx < exclDesc.length; idx++)
+		{
+			buildExclusionImpl(exclDesc[idx]);
+		}
+	} else {
+		buildExclusionImpl(exclDesc);
+	}
+}
+
+function setClassExclusion(newExcl)
+{
+	var thisExcl = AVAIL_EXCLUSIONS[newExcl];
+	if(!thisExcl)
+	{
+		internalAppError('An exclude rule was requested that was not found in the list of permitted rules', 'setClassExclusion');
+		return;
+	}
+	
+	for(var idx=0; idx < thisExcl.exc.length; idx++)
+	{
+		var oldStyle = AVAIL_EXCLUSIONS[thisExcl.exc[idx]].sheet;
+		var node = oldStyle.sheet || oldStyle.styleElement;
+		node.disabled = true;
+	}
+	
+	var node = thisExcl.sheet.sheet || thisExcl.sheet.styleElement;
+	node.disabled = false;
 }
 
 function reXlateAndReplace(target, query, templParms)
@@ -183,6 +298,8 @@ function reXlateAndReplace(target, query, templParms)
 // -----------------------------------------------------------------------------------------------------
 // Application-optimized functions, these attempt to retrieve the current context
 // from a DOM element somewhere in the parent of the element being focused on
+
+var panelContext = {};
 
 function Panel(panelName, action, target)
 {
@@ -211,7 +328,7 @@ function Panel(panelName, action, target)
 		action = this.def.defaults ? this.def.defaults[action.substr(1)] : null;
 	}
 	this.actionName = action;
-	this.action = this.def.actions[this.actionName]
+	this.action = this.def.actions[this.actionName];
 	if(!this.action)
 	{
 		internalAppError('attempt to construct panel ' + this.name + ' with unknown action ' + action, 'Panel');
@@ -274,7 +391,12 @@ Panel.prototype.xlateAndReplace = function(param)
 	}
 	if(this.contextId && ctxSerialize)
 	{
-		req.headers['X-App-Context'] = encodeURIComponent(this.contextId) + '/' + ctxSerialize;
+		if(ctxSerialize)
+		{
+			req.headers['X-App-Context'] = encodeURIComponent(this.contextId) + '/' + ctxSerialize;
+		} else {
+			req.headers['X-App-Request-Context'] = encodeURIComponent(this.contextId);
+		}
 	}
 
 	if(!this.target)
@@ -282,7 +404,14 @@ Panel.prototype.xlateAndReplace = function(param)
 		internalAppError('unable to locate panel-target in shell', 'appXlateAndReplace');
 		return null;
 	}
-	this.query = xlateAndReplace(this.target, req, this.templ);
+	var self = this;
+	this.query = xlateAndReplace(this.target, req, this.templ, function(succeeded)
+	{
+		if(succeeded)
+		{
+			if(self.action.onInject) self.action.onInject(self);
+		}
+	});
 	return this.query;
 };
 
@@ -333,13 +462,13 @@ Panel.prototype.sort = function(thElem, sort)
 	ctx.sortdir = sortdir;
 
 	this.rexlateAndReplace();
-}
+};
 
 // Refresh the current pane with fresh data
 Panel.prototype.refresh = function()
 {
 	this.query = this.xlateAndReplace();
-}
+};
 
 // Check for any blocks, cancel any in-progress requests and prepare for this app to shut down
 Panel.prototype.close = function()
@@ -368,12 +497,12 @@ Panel.prototype.handleResponse = function(url, xmlhttp)
 	} else {
 		xmlDoc = XmlAjaxQuery.parse(xmlhttp.responseText, url);
 	}
-	var result = XMLtoJS(xmlDoc);
+	var result = xmlToJS(xmlDoc);
 	if(result.phpError)
 	{
 		var err = result.phpError;
 		unexpectedResponse(url, 'PHP ' + err['@type'],
-			err['@type'] + ' in ' + err['@file'] + ' line ' + err['@line'] + ': ' + err['_body']);
+			err['@type'] + ' in ' + err['@file'] + ' line ' + err['@line'] + ': ' + err._body);
 		return false;
 	}
 	else if(result.emptyEc2Response)
@@ -388,8 +517,8 @@ Panel.prototype.handleResponse = function(url, xmlhttp)
 	}
 	else if(result.Response && result.Response.Errors)
 	{
-		var code = result.Response.Errors.Error.Code['_body'];
-		var msg = result.Response.Errors.Error.Message['_body'];
+		var code = result.Response.Errors.Error.Code._body;
+		var msg = result.Response.Errors.Error.Message._body;
 		var descr;
 		if(this.def.errors && this.def.errors[code])
 		{
@@ -422,7 +551,7 @@ Panel.prototype.handleResponse = function(url, xmlhttp)
 		}
 		if(oneElem && result[oneElem]['return'])
 		{
-			var ret = result[oneElem]['return']['_body'];
+			var ret = result[oneElem]['return']._body;
 			if(ret == 'true')
 			{
 				return true;
@@ -440,12 +569,12 @@ Panel.prototype.handleResponse = function(url, xmlhttp)
 
 	alert('ran off end of appHandleResponse?!?');
 	return false;
-}
+};
 
 Panel.prototype.submitAction = function(actionDef, content, formElem, callback)
 {
 	var self = this;
-	new AjaxQuery({url: actionDef.url, method: 'post', params: content}, function(xmlhttp)
+	var nothing = new AjaxQuery({url: actionDef.url, method: 'post', params: content}, function(xmlhttp)
 	{
 		if(!xmlhttp)
 		{
@@ -456,7 +585,11 @@ Panel.prototype.submitAction = function(actionDef, content, formElem, callback)
 			if(callback) callback(xmlhttp);
 			if(actionDef.nextAction)
 			{
-				new AppPane(actionDef.nextPane || self.name, actionDef.nextAction);
+				var newPane = new AppPane(actionDef.nextPane || self.name, actionDef.nextAction);
+				if(newPane)
+				{
+					newPane.xlateAndReplace(param);
+				}				
 			} else {
 				appRefreshPanel();
 			}
@@ -478,7 +611,7 @@ Panel.prototype.submitFormAction = function(submitAction, formElem)
 	return this.submitAction(actionDef, content, formElem);
 };
 
-Panel.prototype.delete = function(src, descr, id, delAction)
+Panel.prototype.deletePane = function(src, descr, id, delAction)
 {
 	if(!delAction) action = 'delete';
 	if(!this.def.submitActions[delAction])
@@ -488,7 +621,7 @@ Panel.prototype.delete = function(src, descr, id, delAction)
 	}
 	var actionDef = this.def.submitActions[delAction];
 
-	var msg = 'Are you sure you wish to delete this ' + (actionDef.title || 'item') + ' ' + descr + '?';
+	var msg = 'Are you sure you wish to delete this ' + (actionDef.label || 'item') + ' ' + descr + '?';
 	if(confirm(msg))
 	{
 		this.submitAction(actionDef, actionDef.params + id, src);
@@ -509,6 +642,11 @@ function AppPane(panelName, action)
 		if(!currentAppPane.close()) return null;	// not ready to transition yet, close() should throw the error or explanation
 	}
 	currentAppPane = this;
+
+	if(this.def.exclusionStyles)
+	{
+		buildClassExclusion(this.def.exclusionStyles);
+	}
 
 	var titleObj = document.getElementById('panel-title');
 	if(titleObj)
@@ -659,5 +797,23 @@ function appDelete(src, descr, id, action, panelName)
 		return;
 	}
 	
-	return pane.delete(src, descr, id, action);
+	return pane.deletePane(src, descr, id, action);
+}
+
+// ---------------------------------------------------------------------------- Security group-specific logic
+function secCheckRuleGrp(pane)
+{
+	var extObj = document.getElementById('secExternal');
+	if(extObj.checked)
+	{
+		setClassExclusion('ext');
+	} else {
+		var intMine = document.getElementById('secIntMine');
+		if(intMine.checked)
+		{
+			setClassExclusion('intMine');
+		} else {
+			setClassExclusion('intTheirs');
+		}
+	}
 }

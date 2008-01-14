@@ -136,7 +136,7 @@
 		<table align="center">
 			<tr>
 				<td align="right">From</td>
-				<td><input type="radio" name="type" value="ext" checked="yes" onclick="secCheckRuleGrp()" /> an external IP, or</td>
+				<td><input type="radio" name="type" id="secExternal" value="ext" checked="yes" onclick="secCheckRuleGrp()" /> an external IP, or</td>
 			</tr>
 			<tr>
 				<td></td>
@@ -175,11 +175,11 @@
 			</td></tr>
 			<tr class="secInternal">
 				<td align="right">From</td>
-				<td><input type="radio" name="src" value="me" checked="yes" /> a group that I own, or</td>
+				<td><input type="radio" name="src" id="secIntMine" value="me" checked="yes" onclick="secCheckRuleGrp()" /> a group that I own, or</td>
 			</tr>
 			<tr class="secInternal">
 				<td></td>
-				<td><input type="radio" name="src" value="them" /> someone else's group</td>
+				<td><input type="radio" name="src" value="them" onclick="secCheckRuleGrp()" /> someone else's group</td>
 			</tr>
 			<tr class="secInternal"><td colspan="2"><hr /></td></tr>
 			<tr class="secInternalTheirs"><td colspan="2">
