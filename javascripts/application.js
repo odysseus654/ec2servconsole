@@ -35,27 +35,30 @@ var PANELS = {
 	},
 	ec2_securityGroups: {
 		templ: 'securitygroups.xslt',
-		defaults:  { panel: 'list', add: 'addGroup' },
+		defaults: { panel: 'list', add: 'addGroup' },
 		exclusionStyles: { intMine: ['secInternal', 'secInternalMine'], intTheirs: ['secInternal', 'secInternalTheirs'], ext: ['secExternal'] },
 		actions: {
-			list: { url: 'ec2.php', params: 'action=DescribeSecurityGroups', title: 'Available Security Groups' },
-			addGroup: { label: 'Add Group', cmd: '<addGroup />', title: 'New Security Group' },
-			addRule: {
-				url: 'ec2.php', params: 'action=DescribeSecurityGroups', title: 'Add Rule to Security Group', templParms: {action: 'addRule'},
+			list:		{ url: 'ec2.php', params: 'action=DescribeSecurityGroups', title: 'Available Security Groups' },
+			addGroup:	{ label: 'Add Group', cmd: '<addGroup />', title: 'New Security Group' },
+			addRule:	{
+				url: 'ec2.php', params: 'action=DescribeSecurityGroups&ignore=', title: 'Add Rule to Security Group', templParms: {action: 'addRule'},
 				onInject: secCheckRuleGrp
 			}
 		},
 		submitActions: {
-			addGroup: { url: 'ec2.php', params: 'action=CreateSecurityGroup' },
-			deleteGroup: { label: 'security group', url: 'ec2.php', params: 'action=DeleteSecurityGroup&id=' }
+			addGroup:		{ url: 'ec2.php', params: 'action=CreateSecurityGroup' },
+			deleteGroup:	{ label: 'security group', url: 'ec2.php', params: 'action=DeleteSecurityGroup&id=' },
+			addExtRule:		{ url: 'ec2.php', params: 'action=AuthExtSecGroup' },
+			addIntRule:		{ url: 'ec2.php', params: 'action=AuthIntSecGroup' },
+			delExtRule:		{ url: 'ec2.php', params: 'action=RevokeExtSecGroup' },
+			delIntRule:		{ url: 'ec2.php', params: 'action=RevokeIntSecGroup' }
 		}
 	}
 };
 /*
 instances:		runinstances, describeinstances, terminateinstances, confirmproductcode, rebootinstances, getconsoleoutput
 keys:			createkeypair, describekeypairs, deletekeypair
-securityGroups:	authextsecgroup, revokeextsecgroup, authintsecgroup, revokeintsecgroup
-images:		setproductcode, getprodctcode, modifylaunchpermissions, describelaunchpermissions, resetlaunchpermissions, registerimage, deregisterimage
+images:			setproductcode, getprodctcode, modifylaunchpermissions, describelaunchpermissions, resetlaunchpermissions, registerimage, deregisterimage
 */
 var ERRORS = {
 	'AuthFailure':					'Permission denied',
@@ -382,6 +385,7 @@ Panel.prototype.xlateAndReplace = function(param)
 	}
 	if(param)
 	{
+		req.templParms['param'] = param;
 		if(req.params)
 		{
 			req.params += param;
@@ -597,16 +601,17 @@ Panel.prototype.submitAction = function(actionDef, content, formElem, callback)
 	});
 };
 
-Panel.prototype.submitFormAction = function(submitAction, formElem)
+Panel.prototype.submitFormAction = function(submitAction, formElem, param)
 {
-	if(!submitAction || !this.submitActions[submitAction])
+	if(!submitAction || !this.def.submitActions[submitAction])
 	{
 		internalAppError('attempt to submit a form in panel ' + this.name + ' with invalid or missing action ' + submitAction, 'appSubmitAction');
 		return;
 	}
-	var actionDef = this.submitActions[action];
-	var content = Sarissa.formToQueryString(formElem);
+	var actionDef = this.def.submitActions[submitAction];
+	var content = formElem.elements ? Sarissa.formToQueryString(formElem) : '';
 	if(actionDef.params) content = actionDef.params + '&' + content;
+	if(param) content += param;
 
 	return this.submitAction(actionDef, content, formElem);
 };
@@ -694,7 +699,7 @@ function PopupPanel(panelName, action)
 }
 subclass(PopupPanel, Panel);
 
-PopupPanel.prototype.submitFormAction = function(submitAction, formElem)
+PopupPanel.prototype.submitFormAction = function(submitAction, formElem, param)
 {
 	if(!submitAction || !this.def.submitActions[submitAction])
 	{
@@ -702,8 +707,9 @@ PopupPanel.prototype.submitFormAction = function(submitAction, formElem)
 		return;
 	}
 	var actionDef = this.def.submitActions[submitAction];
-	var content = Sarissa.formToQueryString(formElem);
+	var content = formElem.elements ? Sarissa.formToQueryString(formElem) : '';
 	if(actionDef.params) content = actionDef.params + '&' + content;
+	if(param) content += param;
 
 	return this.submitAction(actionDef, content, formElem, function()
 	{
@@ -772,7 +778,7 @@ function appRefreshPanel(srcElem)
 	pane.refresh();
 }
 
-function appSubmitAction(formElem, action)
+function appSubmitAction(formElem, action, param)
 {
 	var pane = PopupPanel.activePanel(formElem);
 	if(!pane)
@@ -784,7 +790,7 @@ function appSubmitAction(formElem, action)
 	// firefox seems to really not like an XMLHTTP action inside of an onsubmit action, so let's break it out
 	window.setTimeout(function()
 	{
-		pane.submitFormAction(action, formElem);
+		pane.submitFormAction(action, formElem, param);
 	}, 0);
 }
 

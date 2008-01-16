@@ -23,7 +23,9 @@
 	<xsl:param name="sort" />
 	<xsl:param name="sortdir" />
 	<xsl:param name="action" />
+	<xsl:param name="param" />
 
+	<!-- Root element switch to get the "add rule" dialog to appear -->
 	<xsl:template match="ec2:DescribeSecurityGroupsResponse">
 		<xsl:choose>
 			<xsl:when test="$action = 'addRule'">
@@ -35,6 +37,7 @@
 		</xsl:choose>
 	</xsl:template>
 	
+	<!-- Security group list - group list titles -->
 	<xsl:template match="ec2:securityGroupInfo">
 		<table class="securityGroups" width="80%">
 			<tr class="group">
@@ -46,6 +49,7 @@
 		</table>
 	</xsl:template>
 
+	<!-- Security group list - itemize groups -->
 	<xsl:template match="ec2:item" mode="securityGroupInfo">
 		<tr class="group">
 			<td><b><xsl:value-of select="ec2:groupName" /></b></td>
@@ -56,7 +60,7 @@
 						Del
 					</a>
 				</xsl:if>
-				<a href="javascript:void(0)" onclick="appPopupAction('addRule');">
+				<a href="javascript:void(0)" onclick="appPopupAction('addRule', null, '{ec2:groupName}');">
 					Add Rule
 				</a>
 			</td>
@@ -68,6 +72,7 @@
 		</tr>
 	</xsl:template>
 
+	<!-- Security group list - rule list titles -->
 	<xsl:template match="ec2:ipPermissions">
 		<table class="securityRule" align="center" border="1" width="80%">
 			<tr>
@@ -75,42 +80,61 @@
 				<th>from&#160;port</th>
 				<th>to&#160;port</th>
 				<th>source&#160;location</th>
+				<th></th>
 			</tr>
-			<xsl:apply-templates select="ec2:item" mode="ipPermissions" />
+			<xsl:apply-templates select="ec2:item/ec2:groups|ec2:item/ec2:ipRanges" mode="ipPermissions" />
 		</table>
 	</xsl:template>
 
-	<xsl:template match="ec2:item" mode="ipPermissions">
+	<!-- Security group list - itemizing rules -->
+	<xsl:template match="ec2:groups/ec2:item" mode="ipPermissions">
+		<xsl:if test="../../ec2:ipProtocol = 'icmp'">
+			<tr>
+				<td colspan="3" align="center"><i>All network traffic</i></td>
+				<td>
+					<img src="images/silk/server.png" alt="Network" title="Network" />access group
+					<b>
+						<xsl:if test="ec2:item/ec2:userId != ../../ec2:ownerId">
+							<xsl:value-of select="ec2:userId" />/
+						</xsl:if>
+						<xsl:value-of select="ec2:groupName" />
+					</b>
+				</td>
+				<td>
+					<a href="javascript:void(0)" onclick="appSubmitAction(this,'delIntRule','id={../../../../ec2:groupName}&amp;user={ec2:userId}&amp;group={ec2:groupName}')">
+						Del
+					</a>
+				</td>
+			</tr>
+		</xsl:if>
+	</xsl:template>
+
+	<xsl:template match="ec2:ipRanges/ec2:item" mode="ipPermissions">
 		<tr>
-			<td><xsl:value-of select="ec2:ipProtocol" /></td>
+			<td><xsl:value-of select="../../ec2:ipProtocol" /></td>
 			<xsl:choose>
-				<xsl:when test="ec2:ipProtocol = 'icmp'">
+				<xsl:when test="../../ec2:ipProtocol = 'icmp'">
 					<td><i>n/a</i></td>
 					<td><i>n/a</i></td>
 				</xsl:when>
 				<xsl:otherwise>
-					<td><xsl:value-of select="ec2:fromPort" /></td>
-					<td><xsl:value-of select="ec2:toPort" /></td>
+					<td><xsl:value-of select="../../ec2:fromPort" /></td>
+					<td><xsl:value-of select="../../ec2:toPort" /></td>
 				</xsl:otherwise>
 			</xsl:choose>
 			<td>
-				<xsl:if test="ec2:ipRanges != ''">
-					<img src="images/silk/world.png" alt="Internet" title="Internet" />IP range
-					<b><xsl:value-of select="ec2:ipRanges" /></b>
-				</xsl:if>
-				<xsl:if test="ec2:groups != ''">
-					<img src="images/silk/server.png" alt="Network" title="Network" />access group
-					<b>
-						<xsl:if test="ec2:groups/ec2:item/ec2:userId != ../ec2:ownerId">
-							<xsl:value-of select="ec2:groups/ec2:item/ec2:userId" />/
-						</xsl:if>
-						<xsl:value-of select="ec2:groups/ec2:item/ec2:groupName" />
-					</b>
-				</xsl:if>
+				<img src="images/silk/world.png" alt="Internet" title="Internet" />IP range
+				<b><xsl:value-of select="ec2:cidrIp" /></b>
+			</td>
+			<td>
+					<a href="javascript:void(0)" onclick="appSubmitAction(this,'delExtRule','id={../../../../ec2:groupName}&amp;proto={../../ec2:ipProtocol}&amp;ip={ec2:cidrIp}&amp;from={../../ec2:fromPort}&amp;to={../../ec2:toPort}')">
+						Del
+					</a>
 			</td>
 		</tr>
 	</xsl:template>
 
+	<!-- Form - add new group -->
 	<xsl:template match="addGroup">
 		<form onsubmit="appSubmitAction(this,'addGroup'); return false;">
 			<table align="center">
@@ -132,6 +156,7 @@
 		</form>
 	</xsl:template>
 
+	<!-- Form - add new rule -->
 	<xsl:template name="addRule">
 		<table align="center">
 			<tr>
@@ -145,6 +170,7 @@
 			<tr><td colspan="2"><hr /></td></tr>
 			<tr class="secExternal"><td colspan="2">
 				<form onsubmit="appSubmitAction(this,'addExtRule'); return false;"><table align="center">
+					<input type="hidden" name="id" value="{$param}" />
 					<tr>
 						<td align="right">Protocol:</td>
 						<td><select name="proto">
@@ -163,7 +189,7 @@
 					</tr>
 					<tr>
 						<td>Ending port:</td>
-						<td><input type="text" name="ip" size="20" value="65535" /></td>
+						<td><input type="text" name="to" size="20" value="65535" /></td>
 					</tr>
 					<tr>
 						<td colspan="2" align="center">
@@ -184,6 +210,7 @@
 			<tr class="secInternal"><td colspan="2"><hr /></td></tr>
 			<tr class="secInternalTheirs"><td colspan="2">
 				<form onsubmit="appSubmitAction(this,'addIntRule'); return false;"><table align="center">
+					<input type="hidden" name="id" value="{$param}" />
 					<tr>
 						<td>Source group owner ID:</td>
 						<td><input type="text" name="user" size="15" value="1234567890" /></td>
@@ -202,6 +229,7 @@
 			</td></tr>
 			<tr class="secInternalMine"><td colspan="2">
 				<form onsubmit="appSubmitAction(this,'addIntRule'); return false;"><table align="center">
+					<input type="hidden" name="id" value="{$param}" />
 					<tr>
 						<td>Source group:</td>
 						<td>

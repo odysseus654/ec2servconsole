@@ -186,7 +186,7 @@ case 'revokeintsecgroup':
 default:
 	header('Content-Type: text/xml');
 	echo '<?xml version="1.0" ?>' . "\n";
-	echo '<unkownRequest name="' . arg('action') . '"/>';
+	echo '<unknownRequest name="' . arg('action') . '"/>';
 }
 
 ?>
