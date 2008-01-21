@@ -65,7 +65,7 @@ function xmlError($errno, $errstr, $errfile, $errline)
 }
 $old_error_handler = set_error_handler('xmlError');
 
-require('ec2.class.php');
+require('php/ec2.class.php');
 $ec2svc = new EC2();
 
 function arg($name)
