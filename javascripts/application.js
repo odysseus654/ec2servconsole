@@ -90,6 +90,32 @@ var ERRORS = {
 	'Unavailable':					'The AWS system is overloaded or otherwise unavailable.  Please try again later'
 };
 
+// -----------------------------------------------------------------------------------------------------
+// Application-specific version of TransformedAjaxQuery that includes error checking
+
+function AppTransformedAjaxQuery(xslt, req, handler)
+{
+	TransformedAjaxQuery.apply(this, arguments);
+}
+subclass(AppTransformedAjaxQuery, TransformedAjaxQuery);
+
+AppTransformedAjaxQuery.prototype.onLoaded = function()
+{
+	if(this.xml && this.xslt)
+	{
+		if(appResponseOkay(this.xmlSource.url, this.xml))
+		{
+			this.implSetValue(TemplateQuery.transform(this.xslt, this.xml, this.templParms, this.outputMethod));
+		} else {
+			this.implSetValue(null);
+		}
+	} else {
+		this.implSetValue(null);
+	}
+};
+
+// -----------------------------------------------------------------------------------------------------
+
 var CMD_CACHE = {};
 function retrieveTemplCommand(cmd,templ,handler)
 {
@@ -148,7 +174,7 @@ function xlateAndReplace(target, req, templ, callback)
 	var query;
 	if(req.url)
 	{
-		query = new TransformedAjaxQuery('templates/' + templ, req, catchResults);
+		query = new AppTransformedAjaxQuery('templates/' + templ, req, catchResults);
 	}
 	else if(req.cmd)
 	{
@@ -171,6 +197,50 @@ function xlateAndReplace(target, req, templ, callback)
 		});
 	}
 	return query;
+}
+
+function appResponseOkay(url, xml)
+{
+	var result = xmlToJS(xml);
+	if(result.phpError)
+	{
+		var err = result.phpError;
+		unexpectedResponse(url, 'PHP ' + err['@type'],
+			err['@type'] + ' in ' + err['@file'] + ' line ' + err['@line'] + ': ' + err._body);
+		return false;
+	}
+	else if(result.emptyEc2Response)
+	{
+		unexpectedResponse(url, 'Empty EC2 response with status ' + result.emptyEc2Response['@status']);
+		return false;
+	}
+	else if(result.unknownRequest)
+	{
+		unexpectedResponse(url, 'Server did not understand request');
+		return false;
+	}
+	else if(result.Response && result.Response.Errors)
+	{
+		var code = result.Response.Errors.Error.Code._body;
+		var msg = result.Response.Errors.Error.Message._body;
+		var descr;
+		if(this.def.errors && this.def.errors[code])
+		{
+			descr = this.def.errors[code];
+		}
+		else if(ERRORS[code])
+		{
+			descr = ERRORS[code];
+		}
+		else
+		{
+			descr = msg;
+		}
+		alert(descr + '\n\nDetails: [' + code + '] ' + msg);
+		return false;
+	}
+	
+	return true;
 }
 
 // This function has been through a few development iterations.  One often-required feature of complex forms is the ability to show/hide
@@ -501,74 +571,36 @@ Panel.prototype.handleResponse = function(url, xmlhttp)
 	} else {
 		xmlDoc = XmlAjaxQuery.parse(xmlhttp.responseText, url);
 	}
+	if(!appResponseOkay(url, xmlDoc)) return false;
+
+	// can we figure out whether this is the generic "succeeded" response?
 	var result = xmlToJS(xmlDoc);
-	if(result.phpError)
+	var thisElem, oneElem = null, twoElem = null;
+	for(thisElem in result)
 	{
-		var err = result.phpError;
-		unexpectedResponse(url, 'PHP ' + err['@type'],
-			err['@type'] + ' in ' + err['@file'] + ' line ' + err['@line'] + ': ' + err._body);
-		return false;
-	}
-	else if(result.emptyEc2Response)
-	{
-		unexpectedResponse(url, 'Empty EC2 response with status ' + result.emptyEc2Response['@status']);
-		return false;
-	}
-	else if(result.unknownRequest)
-	{
-		unexpectedResponse(url, 'Server did not understand request');
-		return false;
-	}
-	else if(result.Response && result.Response.Errors)
-	{
-		var code = result.Response.Errors.Error.Code._body;
-		var msg = result.Response.Errors.Error.Message._body;
-		var descr;
-		if(this.def.errors && this.def.errors[code])
+		if(!oneElem && !twoElem)
 		{
-			descr = this.def.errors[code];
+			oneElem = thisElem;
+		} else {
+			oneElem = null;
+			twoElem = thisElem;
 		}
-		else if(ERRORS[code])
+	}
+	if(oneElem && result[oneElem]['return'])
+	{
+		var ret = result[oneElem]['return']._body;
+		if(ret == 'true')
 		{
-			descr = ERRORS[code];
+			return true;
+		} else {
+			unexpectedResponse(url, 'EC2 returned failure without additional information');
+			return false;
 		}
-		else
-		{
-			descr = msg;
-		}
-		alert(descr + '\n\nDetails: [' + code + '] ' + msg);
-		return false;
 	}
 	else
 	{
-		// can we figure out whether this is the generic "succeeded" response?
-		var thisElem, oneElem = null, twoElem = null;
-		for(thisElem in result)
-		{
-			if(!oneElem && !twoElem)
-			{
-				oneElem = thisElem;
-			} else {
-				oneElem = null;
-				twoElem = thisElem;
-			}
-		}
-		if(oneElem && result[oneElem]['return'])
-		{
-			var ret = result[oneElem]['return']._body;
-			if(ret == 'true')
-			{
-				return true;
-			} else {
-				unexpectedResponse(url, 'EC2 returned failure without additional information');
-				return false;
-			}
-		}
-		else
-		{
-			unexpectedResponse(url, 'Unknown XML response from server', (new XMLSerializer()).serializeToString(xmlDoc));
-			return false;
-		}
+		unexpectedResponse(url, 'Unknown XML response from server', (new XMLSerializer()).serializeToString(xmlDoc));
+		return false;
 	}
 
 	alert('ran off end of appHandleResponse?!?');
