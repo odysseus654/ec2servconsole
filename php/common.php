@@ -21,7 +21,7 @@ class Session
 	  mysql_select_db($this->DB_database, $this->dbh) or $this->sqlError('dbConnect', 'change to the proper database');
 	  return $this->dbh;
 	}
-
+	
 	function makeSecret($password)
 	{	// adapted from http://www.openldap.org/faq/data/cache/347.html
 	    $salt = os.urandom(4);
@@ -55,10 +55,10 @@ class Session
 		if($isHeart)
 		{
 			$cmd = 'update `' . $this->DB_prefix . 'session` set `lastHeartbeat`=NOW() where `sessionID`=\'' .
-				mysql_real_escape_string($sessID) . \'';
+				mysql_real_escape_string($sessID) . '\'';
 		} else {
 			$cmd = 'update `' . $this->DB_prefix . 'session` set `lastHeartbeat`=NOW(),lastAction=NOW() where `sessionID`=\'' .
-				mysql_real_escape_string($sessID) . \'';
+				mysql_real_escape_string($sessID) . '\'';
 		}
 	    $query = mysql_query($cmd, $this->dbh) or $this->sqlError('retrieveSession', 'refresh the session timestamps');
 		mysql_free_result($query) or $this->sqlError('retrieveSession', 'free refresh of session timestamps');
@@ -114,8 +114,8 @@ class Session
 		
 		return true;
 	}
-	
-	function sqlError(func,ctx)
+
+	function sqlError($func, $ctx)
 	// Called whenever an sql error occurs, throw a descriptive error and get out
 	{
 		die('fail,Could not ' . $ctx . ': ' . mysql_error($this->dbh));
