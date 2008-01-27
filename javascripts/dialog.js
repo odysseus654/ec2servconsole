@@ -49,7 +49,6 @@ function Modal(dialogObj)
 		this.dialogFocuser = focuser;
 	}
 }
-Modal.prototype = {};
 Modal.prototype.prevDialog = null;
 Modal.prototype.modalShowing = false;
 Modal.prototype.onModalCovered = function(newFocus) {}	// hook for when this dialog is "covered" by a different one
@@ -216,7 +215,6 @@ function ModalWindow(content)
 {
 	if(content) this.create(content);
 }
-ModalWindow.prototype = {};
 ModalWindow.prototype.modal = null;
 ModalWindow.prototype.autoDestroy = false;
 ModalWindow.prototype.wrapper = null;
