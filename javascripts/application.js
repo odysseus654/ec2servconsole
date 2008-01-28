@@ -616,13 +616,19 @@ Panel.prototype.handleResponse = function(url, xmlhttp)
 Panel.prototype.submitAction = function(actionDef, content, formElem, callback)
 {
 	var self = this;
-	var nothing = new AjaxQuery({url: actionDef.url, method: 'post', params: content}, function(xmlhttp)
+	var url = actionDef.url || this.def.url;
+	if(!url)
+	{
+		internalAppError('attempt to submit a form without a destination', 'appSubmitActionImpl');
+		return;
+	}
+	var nothing = new AjaxQuery({url: url, method: 'post', params: content}, function(xmlhttp)
 	{
 		if(!xmlhttp)
 		{
 			internalAppError('an unexpected error occurred submitting form data', 'appSubmitActionImpl');
 		}
-		else if(self.handleResponse(actionDef.url, xmlhttp))
+		else if(self.handleResponse(url, xmlhttp))
 		{
 			if(callback) callback(xmlhttp);
 			if(actionDef.nextAction)
@@ -724,18 +730,22 @@ AppPane.prototype.createClickAction = function(action)
 
 // ----------------------------------------------------------------------------
 // Create a popup dialog with the contents of the specified action
-function PopupPanel(panelName, action)
+function PopupPanel(panelName, action, onClose)
 {
 	var hasError = Panel.apply(this, [panelName, action]) === null;
 	if(hasError) return null;
+	this.onCloseCallback = onClose;
 
 	var popup = new DialogWindow(null, this.action.title);
 	popup.popupPanel = this;		// let's just sneak this in here, the only DOM reference we make is also one it makes as well
+	popup.hide = this.hookClosePanel();
 	popup.create();
 	popup.show();
 	this.target = popup.wrapper.inner;
 }
 subclass(PopupPanel, Panel);
+PopupPanel.prototype.returnValue = false;
+PopupPanel.prototype.onCloseCallback = null;
 
 PopupPanel.prototype.submitFormAction = function(submitAction, formElem, param)
 {
@@ -748,12 +758,33 @@ PopupPanel.prototype.submitFormAction = function(submitAction, formElem, param)
 	var content = formElem.elements ? Sarissa.formToQueryString(formElem) : '';
 	if(actionDef.params) content = actionDef.params + '&' + content;
 	if(param) content += param;
-
+	
+	var self = this;
 	return this.submitAction(actionDef, content, formElem, function()
 	{
+		self.returnValue = true;
 		var modal = ModalWindow.activeWindow(formElem);
 		if(modal) modal.destroy();
 	});
+};
+
+PopupPanel.prototype.hookClosePanel = function()
+{
+	var self = this;
+	return function()	// this hooks DialogWindow.hide
+	{
+		debugger;
+		DialogWindow.prototype.hide.apply(this);
+		self.onHideDialog();
+	}
+};
+
+PopupPanel.prototype.onHideDialog = function()
+{
+	if(this.onCloseCallback)
+	{
+		this.onCloseCallback(this);
+	}
 };
 
 // Given a dialog-based pane and an element inside that pane, locate the object representing that pane
