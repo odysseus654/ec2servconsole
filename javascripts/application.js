@@ -26,32 +26,34 @@ var CMD_FAILMSG  = '<failed/>';
 var PANELS = {
 	ec2_images: {
 		templ: 'images.xslt',
+		url: 'ec2.php',
 		defaults: { panel: 'list' },
 		actions: {
-			list: { url: 'ec2.php', params: 'action=DescribeImages', title: 'Available Machine Images' }
-//			detail: { url: 'ec2.php', params: 'action=DescribeImages&id=' },
-//			add: { url: 'ec2.php', params: 'action=DescribeImages&id=', templParms: {action: 'addImage'} }
+			list: { params: 'action=DescribeImages', title: 'Available Machine Images' }
+//			detail: { params: 'action=DescribeImages&id=' },
+//			add: { params: 'action=DescribeImages&id=', templParms: {action: 'addImage'} }
 		}
 	},
 	ec2_securityGroups: {
 		templ: 'securitygroups.xslt',
+		url: 'ec2.php',
 		defaults: { panel: 'list', add: 'addGroup' },
 		exclusionStyles: { intMine: ['secInternal', 'secInternalMine'], intTheirs: ['secInternal', 'secInternalTheirs'], ext: ['secExternal'] },
 		actions: {
-			list:		{ url: 'ec2.php', params: 'action=DescribeSecurityGroups', title: 'Available Security Groups' },
+			list:		{ params: 'action=DescribeSecurityGroups', title: 'Available Security Groups' },
 			addGroup:	{ label: 'Add Group', cmd: '<addGroup />', title: 'New Security Group' },
 			addRule:	{
-				url: 'ec2.php', params: 'action=DescribeSecurityGroups&ignore=', title: 'Add Rule to Security Group', templParms: {action: 'addRule'},
+				params: 'action=DescribeSecurityGroups&ignore=', title: 'Add Rule to Security Group', templParms: {action: 'addRule'},
 				onInject: secCheckRuleGrp
 			}
 		},
 		submitActions: {
-			addGroup:		{ url: 'ec2.php', params: 'action=CreateSecurityGroup' },
-			deleteGroup:	{ label: 'security group', url: 'ec2.php', params: 'action=DeleteSecurityGroup&id=' },
-			addExtRule:		{ url: 'ec2.php', params: 'action=AuthExtSecGroup' },
-			addIntRule:		{ url: 'ec2.php', params: 'action=AuthIntSecGroup' },
-			delExtRule:		{ url: 'ec2.php', params: 'action=RevokeExtSecGroup' },
-			delIntRule:		{ url: 'ec2.php', params: 'action=RevokeIntSecGroup' }
+			addGroup:		{ params: 'action=CreateSecurityGroup' },
+			deleteGroup:	{ label: 'security group', params: 'action=DeleteSecurityGroup&id=' },
+			addExtRule:		{ params: 'action=AuthExtSecGroup' },
+			addIntRule:		{ params: 'action=AuthIntSecGroup' },
+			delExtRule:		{ params: 'action=RevokeExtSecGroup' },
+			delIntRule:		{ params: 'action=RevokeIntSecGroup' }
 		}
 	}
 };
@@ -434,6 +436,10 @@ Panel.prototype.xlateAndReplace = function(param)
 		{
 			req[key] = this.action[key];
 		}
+	}
+	if(!req.url && !req.cmd)
+	{
+		req.url = this.def.url;
 	}
 	req.templParms = {};
 	req.headers = {};
