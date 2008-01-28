@@ -139,9 +139,12 @@ Modal.prototype.hide = function()		// uses: currentDialog, modalShowing, focused
 		Modal.currentDialog.onModalUncovered();
 	} else {
 		Modal.modalShowing = false;
-		try {
-			Modal.focusedElement.focus();
-		} catch(ex) {}
+		if(Modal.focusedElement)
+		{
+			try {
+				Modal.focusedElement.focus();
+			} catch(ex) {}
+		}
 	}
 };
 
@@ -151,7 +154,8 @@ Modal.activeModal = function(loc)
 	return loc ? loc.modalDialog : null;
 };
 
-Modal.onfocus = function(event) {
+Modal.onfocus = function(event)
+{
 	event = event || window.event;
 	var el = event.target || event.srcElement;
 	
@@ -169,12 +173,14 @@ Modal.onfocus = function(event) {
 	// if we''re focusing the dialog, then just clear the blurring flag.
 	// else, focus the dialog and prevent the other event.
 	var p = el.parentNode;
-	while ( p && p.parentNode && p !== Modal.currentDialog.dialog ) {
+	while ( p && p.parentNode && p !== Modal.currentDialog.dialog )
+	{
 		p=p.parentNode;
 	}
 	var dialogFocuser = Modal.currentDialog.dialog;
 	if(isSafari) dialogFocuser = dialogFocuser.firstChild;
-	if ( p !== Modal.currentDialog.dialog ) {
+	if ( p !== Modal.currentDialog.dialog )
+	{
 		try {
 			dialogFocuser.focus();
 		}
@@ -182,8 +188,10 @@ Modal.onfocus = function(event) {
 	}
 };
 
-Modal.onblur = function() {
-	if ( !Modal.modalShowing ) {
+Modal.onblur = function()
+{
+	if ( !Modal.modalShowing )
+	{
 		Modal.focusedElement = document.getElementById('body');
 	}
 };
@@ -195,7 +203,8 @@ Modal.onblur = function() {
 	html.tabIndex = -1;
 	html.onfocus = html.onfocusin = Modal.onfocus;
 	html.onblur = html.onfocusout = Modal.onblur;
-	if ( isSafari ) {
+	if ( isSafari )
+	{
 		html.addEventListener('DOMFocusIn',Modal.onfocus);
 		html.addEventListener('DOMFocusOut',Modal.onblur);
 	}
