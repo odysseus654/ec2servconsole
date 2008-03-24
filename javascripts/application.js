@@ -97,23 +97,54 @@ var ERRORS = {
 
 function AppTransformedAjaxQuery(xslt, req, handler)
 {
+	this.autoRetry = req.autoRetry;
+	this.req = req;
 	TransformedAjaxQuery.apply(this, arguments);
 }
 subclass(AppTransformedAjaxQuery, TransformedAjaxQuery);
+AppTransformedAjaxQuery.prototype.autoRetry = false;
+AppTransformedAjaxQuery.prototype.req = null;
 
 AppTransformedAjaxQuery.prototype.onLoaded = function()
 {
+	var self = this;
+	function retryQuery(panelObj)
+	{
+		if(!panelObj.returnValue)
+		{
+			self.implSetValue(null);
+		} else {
+			// retry this query
+			self.refresh();
+		}
+	}
+	
 	if(this.xml && this.xslt)
 	{
-		if(appResponseOkay(this.xmlSource.url, this.xml))
+		switch(appResponseOkay(this.xmlSource.url, this.xml, this.autoRetry ? retryQuery : null))
 		{
+		case 'succeed':
 			this.implSetValue(TemplateQuery.transform(this.xslt, this.xml, this.templParms, this.outputMethod));
-		} else {
+			break;
+		case 'fail':
 			this.implSetValue(null);
+			break;
+		// case 'ignore':		<-- this technically be considered a failure of the promise to always return a result,
+		//                          responsibility is basically transferred to appResponseOkay to call this.retryQuery
+		//                          if it returns an 'ignore' response
 		}
 	} else {
 		this.implSetValue(null);
 	}
+};
+
+AppTransformedAjaxQuery.prototype.refresh = function()
+{
+	this.xmlSource = new XmlAjaxQuery(this.req, function(xml)
+	{
+		this.xml = xml;
+	});
+	this.compSource.addPromise(this.xmlSource);
 };
 
 // -----------------------------------------------------------------------------------------------------
@@ -133,7 +164,12 @@ function retrieveTemplCommand(cmd,templ,handler)
 		{		// a query is currently in progress, attach to that query
 			cacheVal.setOnAvail(function(result)
 			{
-				handler(result.cloneNode(true));
+				if(result)
+				{
+					handler(result.cloneNode(true));
+				} else {
+					handler(null);
+				}
 			});
 		} else {	// a query is complete, return the results of the previous query
 			handler(cacheVal.cloneNode(true));
@@ -142,8 +178,13 @@ function retrieveTemplCommand(cmd,templ,handler)
 	} else {
 		var query = new TransformedAjaxCommand('templates/' + templ, cmd, function(result)
 		{		// store the results of this query before passing control forward
-			templCache[cmd] = result;
-			handler(result.cloneNode(true));
+			if(result)
+			{
+				templCache[cmd] = result;
+				handler(result.cloneNode(true));
+			} else {
+				handler(null);
+			}
 		});
 		if(!query.isComplete)
 		{		// this query is incomplete, store it in case others want to attach to it
@@ -201,7 +242,7 @@ function xlateAndReplace(target, req, templ, callback)
 	return query;
 }
 
-function appResponseOkay(url, xml)
+function appResponseOkay(url, xml, retryHandler)
 {
 	var result = xmlToJS(xml);
 	if(result.phpError)
@@ -209,17 +250,17 @@ function appResponseOkay(url, xml)
 		var err = result.phpError;
 		unexpectedResponse(url, 'PHP ' + err['@type'],
 			err['@type'] + ' in ' + err['@file'] + ' line ' + err['@line'] + ': ' + err._body);
-		return false;
+		return 'fail';
 	}
 	else if(result.emptyEc2Response)
 	{
 		unexpectedResponse(url, 'Empty EC2 response with status ' + result.emptyEc2Response['@status']);
-		return false;
+		return 'fail';
 	}
 	else if(result.unknownRequest)
 	{
 		unexpectedResponse(url, 'Server did not understand request');
-		return false;
+		return 'fail';
 	}
 	else if(result.Response && result.Response.Errors)
 	{
@@ -239,10 +280,10 @@ function appResponseOkay(url, xml)
 			descr = msg;
 		}
 		alert(descr + '\n\nDetails: [' + code + '] ' + msg);
-		return false;
+		return 'fail';
 	}
 	
-	return true;
+	return 'succeed';
 }
 
 // This function has been through a few development iterations.  One often-required feature of complex forms is the ability to show/hide
@@ -423,7 +464,7 @@ Panel.prototype.templ = null;
 Panel.prototype.target = null;		// DOM reference, avoid circular references!
 
 // Construct the pane with the specified action and optional parameter
-Panel.prototype.xlateAndReplace = function(param)
+Panel.prototype.xlateAndReplace = function(param, autoRetry)
 {
 	var ctx = this.contextId ? panelContext[this.contextId] : null;
 	var req = {};
@@ -477,6 +518,10 @@ Panel.prototype.xlateAndReplace = function(param)
 		} else {
 			req.headers['X-App-Request-Context'] = encodeURIComponent(this.contextId);
 		}
+	}
+	if(autoRetry)
+	{
+		req.autoRetry = true;
 	}
 
 	if(!this.target)
@@ -547,7 +592,7 @@ Panel.prototype.sort = function(thElem, sort)
 // Refresh the current pane with fresh data
 Panel.prototype.refresh = function()
 {
-	this.query = this.xlateAndReplace();
+	this.query = this.xlateAndReplace(null, true);
 };
 
 // Check for any blocks, cancel any in-progress requests and prepare for this app to shut down
@@ -577,7 +622,7 @@ Panel.prototype.handleResponse = function(url, xmlhttp)
 	} else {
 		xmlDoc = XmlAjaxQuery.parse(xmlhttp.responseText, url);
 	}
-	if(!appResponseOkay(url, xmlDoc)) return false;
+	if(appResponseOkay(url, xmlDoc) != 'success') return false;
 
 	// can we figure out whether this is the generic "succeeded" response?
 	var result = xmlToJS(xmlDoc);
@@ -636,7 +681,7 @@ Panel.prototype.submitAction = function(actionDef, content, formElem, callback)
 				var newPane = new AppPane(actionDef.nextPane || self.name, actionDef.nextAction);
 				if(newPane)
 				{
-					newPane.xlateAndReplace(param);
+					newPane.xlateAndReplace(param, false);
 				}				
 			} else {
 				appRefreshPanel();
@@ -810,7 +855,7 @@ function appSetPanel(panelName,action)
 	var pane = new AppPane(panelName, action);
 	if(pane)
 	{
-		pane.xlateAndReplace();
+		pane.xlateAndReplace(null, true);
 	}
 }
 
@@ -819,7 +864,7 @@ function appPopupAction(action, panelName, param)
 	var pane = new PopupPanel(panelName || (currentAppPane ? currentAppPane.def : null), action);
 	if(pane)
 	{
-		pane.xlateAndReplace(param);
+		pane.xlateAndReplace(param, true);
 	}
 }
 
