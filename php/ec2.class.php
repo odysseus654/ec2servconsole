@@ -23,6 +23,21 @@
  *	NOTE: DON'T BE STUPID AND POST YOUR KEY PUBLICALLY, LIKE I AND AT LEAST ONE OTHER PERSON HAS
  *
  */
+
+ function ec2Response(&$ec2svc, $text)
+{
+	if($text)
+	{
+		header('Content-Type: ' . $ec2svc->getResponseContentType());
+		echo $text;
+		return;
+	}
+
+	header('Content-Type: text/xml');
+	echo '<?xml version="1.0" ?>' . "\n";
+	echo '<emptyEc2Response status="' . $ec2svc->getResponseCode() . '"/>';
+}
+
 class ec2 {
 
 	// The API access point URL
@@ -33,10 +48,9 @@ class ec2 {
 
 	// -----------------------------------------
 	// -----------------------------------------
-	// your API key ID
-	var $keyId = "00000000000000000000";
-	// your API Secret Key
-	var $secretKey = "0000000000000000000000000000000000000000";
+	// The Amazon Secret (set before making requests)
+	var $keyId;
+	var $secretKey;
 	// -----------------------------------------
 	// -----------------------------------------
 		

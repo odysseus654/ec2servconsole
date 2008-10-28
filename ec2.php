@@ -18,79 +18,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+require('php/common.php');
+require('php/ec2.class.php');
 
 // error handler function
-function xmlError($errno, $errstr, $errfile, $errline)
-{
-	header('Content-Type: text/xml');
-	echo '<?xml version="1.0" ?>' . "\n";
-
-	switch ($errno)
-	{
-	case E_ERROR:
-		echo '<phpError type="error" ';
-		break;
-	case E_WARNING:
-		echo '<phpError type="warning" ';
-		break;
-	case E_NOTICE:
-		echo '<phpError type="notice" ';
-		break;
-	case E_USER_ERROR:
-		echo '<phpError type="user-error" ';
-		break;
-	case E_USER_WARNING:
-		echo '<phpError type="user-warning" ';
-		break;
-	case E_USER_NOTICE:
-		echo '<phpError type="user-notice" ';
-		break;
-	case E_STRICT:
-		echo '<phpError type="strict" ';
-		break;
-	case E_RECOVERABLE_ERROR:
-		echo '<phpError type="recoverable" ';
-		break;
-	default:
-		echo '<phpError type="' . $errno . '" ';
-		break;
-	}
-
-	echo 'file="' . $errfile . '" line="' . $errline . '">';
-	echo $errstr;
-	echo '</phpError>';
-
-	/* Don't execute PHP internal error handler */
-	exit(1);
-}
 $old_error_handler = set_error_handler('xmlError');
 
-require('php/ec2.class.php');
+// Establish the session
+$session = new Session();
+if(!isset($_COOKIE['sessionID']) || !$session->retrieveSession($_COOKIE['sessionID'], false))
+{
+	badLogin();
+}
 $ec2svc = new EC2();
-
-function arg($name)
-{
-	if($_SERVER['REQUEST_METHOD'] == 'POST')
-	{
-		if(isset($_POST[$name])) return $_POST[$name]; else return NULL;
-	} else {
-		if(isset($_GET[$name])) return $_GET[$name]; else return NULL;
-	}
-}
-
-function ec2Response(&$ec2svc, $text)
-{
-	if($text)
-	{
-		header('Content-Type: ' . $ec2svc->getResponseContentType());
-		echo $text;
-		return;
-	}
-
-	header('Content-Type: text/xml');
-	echo '<?xml version="1.0" ?>' . "\n";
-	echo '<emptyEc2Response status="' . $ec2svc->getResponseCode() . '"/>';
-}
+$ec2svc->keyID = $session->AWSAccessKeyID;
+$ec2svc->secretKey = $session->AWSSecret;
 
 switch(strtolower(arg('action')))
 {

@@ -23,6 +23,8 @@ var CMD_LOADMSG  = '<loading/>';
 var CMD_RELOADMSG = '<reloading/>';
 var CMD_FAILMSG  = '<failed/>';
 
+var DEFAULT_PANE = 'ec2_securityGroups';
+
 var PANELS = {
 	ec2_images: {
 		templ: 'images.xslt',
@@ -55,6 +57,18 @@ var PANELS = {
 			delExtRule:		{ params: 'action=RevokeExtSecGroup' },
 			delIntRule:		{ params: 'action=RevokeIntSecGroup' }
 		}
+	},
+	login: {
+		templ: 'login.xslt',
+		url: 'login.php',
+		actions: {
+			dialog: { cmd: '<loginDialog />', title: 'Login Required' },
+			createAccount: { cmd: '<createAccount />', title: 'Create a New Organization/Account' }
+		},
+		submitActions: {
+			login:			{ params: 'action=login', nextPane: DEFAULT_PANE },
+			createAccount:	{ params: 'action=createAccount', nextPane: DEFAULT_PANE }
+		}
 	}
 };
 /*
@@ -76,7 +90,7 @@ var ERRORS = {
 	'InvalidGroup.Duplicate':		'Security group with this name already exists',
 	'InvalidGroup.InUse':			'Security group is in use, must be idle to be deleted',
 	'InvalidGroup.Reserved':		'You cannot use this name as a security group',
-	'InvalidParameterValue': 		'Internal: EC2 submitted request was invalid',
+	'InvalidParameterValue': 		'Internal: Submitted request was invalid',
 	'InvalidPermission.Duplicate':	'You already granted this permission',
 	'InvalidPermission.Malformed':	'This permission makes no sense',
 	'InvalidReservationID.Malformed': 'Reservation ID does not exist',
@@ -89,7 +103,9 @@ var ERRORS = {
 	'UnknownParameter':				'Internal: EC2 submitted request was invalid',
 	'InternalError':				'AWS Internal error occurred.  If you can reproduce it, please post a message on the AWS forums.',
 	'InsufficientInstanceCapacity':	'Not enough free machines are available, please try again later or reduce the size of your request',
-	'Unavailable':					'The AWS system is overloaded or otherwise unavailable.  Please try again later'
+	'Unavailable':					'The AWS system is overloaded or otherwise unavailable.  Please try again later',
+	
+	'CreateAccount.LoginExists':	'The login name you have chosen is already in use'
 };
 
 // -----------------------------------------------------------------------------------------------------
@@ -267,11 +283,7 @@ function appResponseOkay(url, xml, retryHandler)
 		var code = result.Response.Errors.Error.Code._body;
 		var msg = result.Response.Errors.Error.Message._body;
 		var descr;
-		if(this.def.errors && this.def.errors[code])
-		{
-			descr = this.def.errors[code];
-		}
-		else if(ERRORS[code])
+		if(ERRORS[code])
 		{
 			descr = ERRORS[code];
 		}
@@ -281,6 +293,13 @@ function appResponseOkay(url, xml, retryHandler)
 		}
 		alert(descr + '\n\nDetails: [' + code + '] ' + msg);
 		return 'fail';
+	}
+	else if(result.badLogin)
+	{
+		// user is not logged in?  put up a popup dialog box and ask for credentials
+		var pane = new PopupPanel('login', 'dialog', retryHandler);
+		if(pane) pane.xlateAndReplace();
+		return retryHandler ? 'ignore' : 'fail';
 	}
 	
 	return 'succeed';
@@ -622,7 +641,7 @@ Panel.prototype.handleResponse = function(url, xmlhttp)
 	} else {
 		xmlDoc = XmlAjaxQuery.parse(xmlhttp.responseText, url);
 	}
-	if(appResponseOkay(url, xmlDoc) != 'success') return false;
+	if(appResponseOkay(url, xmlDoc) != 'succeed') return false;
 
 	// can we figure out whether this is the generic "succeeded" response?
 	var result = xmlToJS(xmlDoc);
@@ -647,6 +666,10 @@ Panel.prototype.handleResponse = function(url, xmlhttp)
 			unexpectedResponse(url, 'EC2 returned failure without additional information');
 			return false;
 		}
+	}
+	else if(oneElem=='success')
+	{
+		return true;
 	}
 	else
 	{
@@ -676,12 +699,13 @@ Panel.prototype.submitAction = function(actionDef, content, formElem, callback)
 		else if(self.handleResponse(url, xmlhttp))
 		{
 			if(callback) callback(xmlhttp);
-			if(actionDef.nextAction)
+			if(actionDef.nextAction || actionDef.nextPane)
 			{
+				debugger;
 				var newPane = new AppPane(actionDef.nextPane || self.name, actionDef.nextAction);
 				if(newPane)
 				{
-					newPane.xlateAndReplace(param, false);
+					newPane.xlateAndReplace();
 				}				
 			} else {
 				appRefreshPanel();
