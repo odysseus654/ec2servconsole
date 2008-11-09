@@ -31,7 +31,7 @@ if(!isset($_COOKIE['sessionID']) || !$session->retrieveSession($_COOKIE['session
 	badLogin();
 }
 $ec2svc = new EC2();
-$ec2svc->keyID = $session->AWSAccessKeyID;
+$ec2svc->keyId = $session->AWSAccessKeyID;
 $ec2svc->secretKey = $session->AWSSecret;
 
 switch(strtolower(arg('action')))

@@ -72,7 +72,7 @@ class ec2 {
 		// get with "pear install Crypt_HMAC"
 		require_once 'Crypt/HMAC.php';
 		
-		$this->hasher =& new Crypt_HMAC($this->secretKey, "sha1");
+//		$this->hasher =& new Crypt_HMAC($this->secretKey, "sha1");
 		
 		// REQUIRES PEAR PACKAGE
 		// get with "pear install --onlyreqdeps HTTP_Request"
@@ -142,7 +142,8 @@ class ec2 {
 		$this->debug_text("HTTP Request sent to: " . $this->EC2_URL . ':' . $action);
 		
 		$this->debug_text("Signing String: ".var_export($signTarget,true));
-		$signature = $this->hex2b64($this->hasher->hash($signTarget));
+		$hasher = new Crypt_HMAC($this->secretKey, "sha1");
+		$signature = $this->hex2b64($hasher->hash($signTarget));
 		$this->debug_text("Signature: $signature");
 		$queryString .= '&Signature=' . urlencode($signature);
 		$this->debug_text("Query: " . $queryString);

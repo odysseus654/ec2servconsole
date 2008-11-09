@@ -97,7 +97,7 @@ function handleCreateAccount()
 
 	// check to see if the EC2 login is valid
 	$ec2svc = new EC2();
-	$ec2svc->keyID = arg('ec2account');
+	$ec2svc->keyId = arg('ec2account');
 	$ec2svc->secretKey = arg('ec2pass');
 	$ec2result = $ec2svc->describeSecurityGroups();
 	if($ec2svc->getResponseCode() != 200)
