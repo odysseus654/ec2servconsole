@@ -42,7 +42,8 @@ class ec2 {
 
 	// The API access point URL
 	var $EC2_URL = "http://ec2.amazonaws.com/";
-	
+	var $EC2_VERSION = '2008-08-08';
+
 	// set to true to echo debug info
 	var $_debug = false;
 
@@ -114,7 +115,7 @@ class ec2 {
 			'AWSAccessKeyId' => $this->keyId,
 			'SignatureVersion' => '1',
 			'Timestamp' => $httpDate,
-			'Version' => '2007-01-03');
+			'Version' => $this->EC2_VERSION);
 		
 		if (is_array($parms))
 		{
@@ -327,6 +328,18 @@ class ec2 {
 		{
 			$parms['InstanceType'] = $options['type'];
 		}
+		if(isset($options['zone']))
+		{
+			$parms['Placement.AvailabilityZone'] = $options['zone'];
+		}
+		if(isset($options['kernel']))
+		{
+			$parms['KernelId'] = $options['kernel'];
+		}
+		if(isset($options['ramdisk']))
+		{
+			$parms['RamdiskId'] = $options['ramdisk'];
+		}
 
 		if(isset($options['group']))
 		{
@@ -374,7 +387,7 @@ class ec2 {
 	*/
 	function confirmProductInstance($productCode, $instanceID)
 	{
-		return $this->sendRequest('ConfirmPRoductInstance', 'GET',
+		return $this->sendRequest('ConfirmProductInstance', 'GET',
 			array('ProductCode' => $productCode, 'InstanceId' => $instanceID));
 	}
 

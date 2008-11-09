@@ -19,15 +19,17 @@
 	limitations under the License.
 -->
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-	xmlns:ec2="http://ec2.amazonaws.com/doc/2007-01-03/" version="1.0">
+	xmlns:ec2="http://ec2.amazonaws.com/doc/2008-08-08/" version="1.0">
 	<xsl:param name="sort" />
 	<xsl:param name="sortdir" />
+	
+	<xsl:template match="ec2:requestId"></xsl:template>
 
 	<xsl:template name="colSortHdr">
 		<xsl:param name="col" />
 		<xsl:param name="title" select="$col" />
 		
-		<th onclick="panelSort(this, '{$col}')" title="Sort by this field">
+		<th onclick="panelSort(this, '{$col}')" title="Sort by this field" style="cursor: default">
 			<xsl:if test="$sort = $col">
 				<xsl:choose>
 					<xsl:when test="$sortdir='d'">
@@ -43,7 +45,15 @@
 	</xsl:template>
 	
 	<xsl:template match="ec2:DescribeImagesResponse">
-		<xsl:apply-templates />
+		<xsl:choose>
+			<xsl:when test="count(ec2:imagesSet/ec2:item) = 1">
+				<xsl:apply-templates select="ec2:imagesSet/ec2:item" mode="singleItem" />
+			</xsl:when>
+			<xsl:otherwise>
+				hi there <xsl:value-of select="count(.//ec2:item)" /> and all
+				<xsl:apply-templates />
+			</xsl:otherwise>
+		</xsl:choose>
 	</xsl:template>
 	
 	<xsl:template match="ec2:imagesSet">
@@ -56,6 +66,10 @@
 				<xsl:call-template name="colSortHdr">
 					<xsl:with-param name="col" select="'loc'" />
 					<xsl:with-param name="title" select="'Location'" />
+				</xsl:call-template>
+				<xsl:call-template name="colSortHdr">
+					<xsl:with-param name="col" select="'arch'" />
+					<xsl:with-param name="title" select="'Arch'" />
 				</xsl:call-template>
 				<xsl:call-template name="colSortHdr">
 					<xsl:with-param name="col" select="'owner'" />
@@ -93,6 +107,25 @@
 						</xsl:otherwise>
 					</xsl:choose>
 				</xsl:when>
+				<xsl:when test="$sort = 'arch'">
+					<xsl:choose>
+						<xsl:when test="$sortdir='d'">
+							<xsl:apply-templates select="ec2:item" mode="imagesSet">
+								<xsl:sort select="ec2:architecture" order="descending" />
+							</xsl:apply-templates>
+						</xsl:when>
+						<xsl:otherwise>
+							<xsl:apply-templates select="ec2:item" mode="imagesSet">
+								<xsl:sort select="ec2:architecture" order="ascending" />
+							</xsl:apply-templates>
+						</xsl:otherwise>
+					</xsl:choose>
+				</xsl:when>
+				<xsl:otherwise>
+					<xsl:apply-templates select="ec2:item" mode="imagesSet" >
+						<xsl:sort select="ec2:architecture" order="descending"/>
+					</xsl:apply-templates>
+				</xsl:otherwise>
 				<xsl:when test="$sort = 'owner'">
 					<xsl:choose>
 						<xsl:when test="$sortdir='d'">
@@ -119,23 +152,74 @@
 	<xsl:template match="ec2:item" mode="imagesSet">
 		<tr>
 			<xsl:choose>
-				<xsl:when test="ec2:isPublic = 'true'">
-					<xsl:attribute name="class">public</xsl:attribute>
-				</xsl:when>
-				<xsl:when test="ec2:imageOwnerId = 'amazon'">
-					<xsl:attribute name="class">amazon</xsl:attribute>
+				<xsl:when test="ec2:imageState != 'available'">
+					<xsl:attribute name="class">disabled</xsl:attribute>
 				</xsl:when>
 				<xsl:when test="ec2:productCodes">
 					<xsl:attribute name="class">paid</xsl:attribute>
 				</xsl:when>
-				<xsl:when test="ec2:imageState != 'available'">
-					<xsl:attribute name="class">disabled</xsl:attribute>
+				<xsl:when test="ec2:imageOwnerId = 'amazon'">
+					<xsl:attribute name="class">amazon</xsl:attribute>
+				</xsl:when>
+				<xsl:when test="ec2:isPublic = 'true'">
+					<xsl:attribute name="class">public</xsl:attribute>
 				</xsl:when>
 			</xsl:choose>
-			<td><xsl:value-of select="ec2:imageId" /></td>
+			<td style="wrap: nowrap">
+				<xsl:choose>
+					<xsl:when test="ec2:imageType = 'kernel'">
+						<img src="images/silk/brick.png" alt="kernel" />
+					</xsl:when>
+					<xsl:when test="ec2:imageType = 'ramdisk'">
+						<img src="images/silk/drive.png" alt="ramdisk" />
+					</xsl:when>
+					<xsl:when test="ec2:imageType = 'machine'">
+						<img src="images/silk/computer.png" alt="machine" />
+					</xsl:when>
+				</xsl:choose>
+				<xsl:value-of select="ec2:imageId" />
+			</td>
 			<td><xsl:value-of select="ec2:imageLocation" /></td>
+			<td><xsl:value-of select="ec2:platform" /><xsl:text> </xsl:text><xsl:value-of select="ec2:architecture" /></td>
 			<td><xsl:value-of select="ec2:imageOwnerId" /></td>
-			<td onclick="add(this,'{ec2:imageId}')">Add</td>
+			<td style="wrap: nowrap">
+				<a onclick="appPopupAction('add', null, '{ec2:imageId}')" style="cursor:pointer"><img src="images/silk/add.png" alt="Add" /></a>
+				<a onclick="appPopupAction('detail', null,'{ec2:imageId}')" style="cursor:pointer"><img src="images/silk/magnifier.png" alt="Examine" /></a>
+			</td>
 		</tr>
+	</xsl:template>
+
+	<xsl:template match="ec2:item" mode="singleItem">
+		<table>
+			<tr><th>ID</th><td><xsl:value-of select="ec2:imageId" /></td></tr>
+			<tr><th>Type</th><td><xsl:value-of select="ec2:imageType" /></td></tr>
+			<tr><th>Platform</th><td><xsl:value-of select="ec2:platform" /><xsl:text> </xsl:text><xsl:value-of select="ec2:architecture" /></td></tr>
+			<tr>
+				<th>Status</th>
+				<td>
+					<xsl:if test="ec2:isPublic = 'true'">public<xsl:text> </xsl:text></xsl:if>
+					<xsl:if test="ec2:productCodes">paid<xsl:text> </xsl:text></xsl:if>
+					<xsl:if test="ec2:imageState != 'available'">disabled<xsl:text> </xsl:text></xsl:if>
+				</td>
+			</tr>
+			<tr><th>Location</th><td><xsl:value-of select="ec2:imageLocation" /></td></tr>
+			<tr><th>Owner</th><td><xsl:value-of select="ec2:imageOwnerId" /></td></tr>
+			<xsl:if test="ec2:productCodes">
+				<tr><th>Product&#160;Code</th><td><xsl:apply-templates select="ec2:productCodes/ec2:item" mode="singleItemProduct" /></td></tr>
+			</xsl:if>
+			<xsl:if test="ec2:kernelId">
+				<tr><th>Default&#160;Kernel</th><td><xsl:value-of select="ec2:kernelId" /></td></tr>
+			</xsl:if>
+			<xsl:if test="ec2:ramdiskId">
+				<tr><th>Default&#160;Ramdisk</th><td><xsl:value-of select="ec2:ramdiskId" /></td></tr>
+			</xsl:if>
+		</table>
+	</xsl:template>
+	
+	<xsl:template match="ec2:item" mode="singleItemProduct">
+		<xsl:if test="position() != 1">
+			<xsl:text>, </xsl:text>
+		</xsl:if>
+		<xsl:value-of select="ec2:productCode" />
 	</xsl:template>
 </xsl:stylesheet>

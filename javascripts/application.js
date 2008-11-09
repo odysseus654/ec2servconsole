@@ -23,7 +23,14 @@ var CMD_LOADMSG  = '<loading/>';
 var CMD_RELOADMSG = '<reloading/>';
 var CMD_FAILMSG  = '<failed/>';
 
-var DEFAULT_PANE = 'ec2_securityGroups';
+var DEFAULT_PANE = 'ec2_images';
+
+var PANELGROUPS = {
+	default: [
+		{ icon: 'shield', name: 'ec2_securityGroups', title: 'Security Groups' },
+		{ icon: 'cd', name: 'ec2_images', title: 'Images' }
+	]
+};
 
 var PANELS = {
 	ec2_images: {
@@ -31,8 +38,8 @@ var PANELS = {
 		url: 'ec2.php',
 		defaults: { panel: 'list' },
 		actions: {
-			list: { params: 'action=DescribeImages', title: 'Available Machine Images' }
-//			detail: { params: 'action=DescribeImages&id=' },
+			list: { params: 'action=DescribeImages', title: 'Available Machine Images' },
+			detail: { params: 'action=DescribeImages&id=', title: 'Machine Image Details' },
 //			add: { params: 'action=DescribeImages&id=', templParms: {action: 'addImage'} }
 		}
 	},
@@ -66,7 +73,7 @@ var PANELS = {
 			createAccount: { cmd: '<createAccount />', title: 'Create a New Organization/Account' }
 		},
 		submitActions: {
-			login:			{ params: 'action=login', nextPane: DEFAULT_PANE },
+			login:			{ params: 'action=login' },
 			createAccount:	{ params: 'action=createAccount', nextPane: DEFAULT_PANE }
 		}
 	}
@@ -842,7 +849,6 @@ PopupPanel.prototype.hookClosePanel = function()
 	var self = this;
 	return function()	// this hooks DialogWindow.hide
 	{
-		debugger;
 		DialogWindow.prototype.hide.apply(this);
 		self.onHideDialog();
 	}

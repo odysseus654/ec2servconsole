@@ -18,8 +18,7 @@
 	See the License for the specific language governing permissions and
 	limitations under the License.
 -->
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-	xmlns:ec2="http://ec2.amazonaws.com/doc/2007-01-03/" version="1.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
 
 	<xsl:template match="loading">
 		<div style="text-align: center; font: bold italic 25px sans-serif; color: gray" width="100%">
