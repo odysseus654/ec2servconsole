@@ -41,7 +41,8 @@
 class ec2 {
 
 	// The API access point URL
-	var $EC2_URL = "http://ec2.amazonaws.com/";
+	var $EC2_METHOD = 'http';				// use https if your php installation supports it
+	var $EC2_HOST = 'ec2.amazonaws.com';
 	var $EC2_VERSION = '2008-08-08';
 
 	// set to true to echo debug info
@@ -66,7 +67,10 @@ class ec2 {
 	*/
 	function ec2($options = NULL)
 	{
-		define('DATE_ISO8601', 'Y\-m\-d\TH\:i\:s\Z');
+		if(!defined('DATE_ISO8601'))
+		{
+			define('DATE_ISO8601', 'Y\-m\-d\TH\:i\:s\Z');
+		}
 		$this->httpDate = gmdate(DATE_ISO8601);
 		
 		// REQUIRES PEAR PACKAGE
@@ -102,10 +106,6 @@ class ec2 {
 	*/
 	function sendRequest($action, $verb = NULL, $parms = NULL)
 	{
-		if ($verb == NULL) {
-			$verb = $this->verb;
-		}
-		
 		// update date / time on each request
 		$this->httpDate = gmdate(DATE_ISO8601);
 		$httpDate = $this->httpDate;
@@ -113,7 +113,8 @@ class ec2 {
 		// the parts of the request that we do ourselves		
 		$request = array('Action' => $action,
 			'AWSAccessKeyId' => $this->keyId,
-			'SignatureVersion' => '1',
+			'SignatureVersion' => '2',
+			'SignatureMethod' => 'HmacSHA1',
 			'Timestamp' => $httpDate,
 			'Version' => $this->EC2_VERSION);
 		
@@ -127,21 +128,18 @@ class ec2 {
 
 		}
 
-		uksort($request, 'strcasecmp');
+		uksort($request, 'strcmp');
 
 		$queryString = '';
-		$delimiter = '?';
-		$signTarget = '';
+		$delimiter = '';
 
 		foreach($request as $key => $value)
 		{
-			$signTarget .= $key . $value;
 			$queryString .= $delimiter . $key . '=' . urlencode($value);
 			$delimiter = '&';
 		}
 
-		$this->debug_text("HTTP Request sent to: " . $this->EC2_URL . ':' . $action);
-		
+		$signTarget = $verb . "\n" . $this->EC2_HOST . "\n/\n" . $queryString;
 		$this->debug_text("Signing String: ".var_export($signTarget,true));
 		$hasher = new Crypt_HMAC($this->secretKey, "sha1");
 		$signature = $this->hex2b64($hasher->hash($signTarget));
@@ -149,7 +147,7 @@ class ec2 {
 		$queryString .= '&Signature=' . urlencode($signature);
 		$this->debug_text("Query: " . $queryString);
 						
-		$req =& new HTTP_Request($this->EC2_URL . $queryString);
+		$req =& new HTTP_Request($this->EC2_METHOD . '://' . $this->EC2_HOST . '/?' . $queryString);
 		$req->setMethod($verb);
 		$req->sendRequest();		
 		
