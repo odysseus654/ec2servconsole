@@ -3,9 +3,9 @@
 -- http://www.phpmyadmin.net
 -- 
 -- Host: localhost
--- Generation Time: Nov 08, 2008 at 11:14 PM
+-- Generation Time: Feb 27, 2009 at 12:13 AM
 -- Server version: 5.0.27
--- PHP Version: 4.3.11RC1-dev
+-- PHP Version: 5.2.6
 
 SET SQL_MODE="NO_AUTO_VALUE_ON_ZERO";
 
@@ -45,6 +45,21 @@ CREATE TABLE `images` (
   `ramdiskId` varchar(15) default NULL,
   PRIMARY KEY  (`accountID`,`amazonId`),
   UNIQUE KEY `name` (`accountID`,`label`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+-- --------------------------------------------------------
+
+-- 
+-- Table structure for table `kernels`
+-- 
+
+CREATE TABLE `kernels` (
+  `amazonId` varchar(15) NOT NULL,
+  `location` varchar(200) NOT NULL default 'none',
+  `attributes` set('paid','amazon') default NULL,
+  `arch` enum('i386','x86_64') NOT NULL default 'i386',
+  `imageType` enum('kernel','ramdisk') NOT NULL default 'kernel',
+  PRIMARY KEY  (`amazonId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------

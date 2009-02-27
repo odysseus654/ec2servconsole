@@ -233,4 +233,77 @@ function badLogin()
 	returnXml('<badLogin />');
 }
 
+function xml2php($xml)		// I *really* miss domxml_xmltree!
+{
+//	$doc = DOMDocument::loadXML($xml);
+	$doc = new DOMDocument();
+	$doc->loadXML($xml);
+	return xml2phpHelper($doc->documentElement);
+}
+
+function xml2phpHelper($node)
+{
+	if($node->nodeType == XML_TEXT_NODE)
+	{
+		return $node->wholeText;
+	}
+	else if($node->nodeType != XML_ELEMENT_NODE)
+	{
+		return null;
+	}
+	
+	$result = array();
+	$hasContent = false;
+	foreach ($node->attributes as $attrName => $attrNode)
+	{
+		$result['@'.$attrName] = $attrNode->nodeValue;
+		$hasContent = true;
+	}
+	$children = $node->childNodes;
+	$body = null;
+	if($children)
+	{
+		for($i=0; $i < $children->length; $i++)
+		{
+			$child = $children->item($i);
+			$childResult = xml2phpHelper($child);
+			if(!is_array($childResult) && $child->nodeType != XML_ELEMENT_NODE)
+			{
+				$childResult = trim($childResult);
+				if($childResult != '')
+				{
+					$body = $childResult;
+				}
+			} else {
+				$hasContent = true;
+				$childName = $child->nodeName;
+				if(!isset($result[$childName]))
+				{
+					$result[$childName] = $childResult;
+				}
+				else if(!is_array($result[$childName]) || !isset($result[$childName][0]))
+				{
+					$subResult = array();
+					$subResult[] = $result[$childName];
+					$subResult[] = $childResult;
+					$result[$childName] = $subResult;
+				}
+				else
+				{
+					$result[$childName][] = $childResult;
+				}
+			}
+		}
+	}
+	if($body != null)
+	{
+		if($hasContent)
+		{
+			$result['_body'] = $body;
+		} else {
+			$result = $body;
+		}
+	}
+	return $result;
+}
 ?>

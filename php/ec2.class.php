@@ -80,9 +80,9 @@ class ec2 {
 //		$this->hasher =& new Crypt_HMAC($this->secretKey, "sha1");
 		
 		// REQUIRES PEAR PACKAGE
-		// get with "pear install --onlyreqdeps HTTP_Request"
+		// get with "pear install --onlyreqdeps HTTP_Request2"
 		
-		require_once 'HTTP/Request.php';
+		require_once 'HTTP/Request2.php';
 	}
 	
 	function getResponseContentType()
@@ -147,18 +147,18 @@ class ec2 {
 		$queryString .= '&Signature=' . urlencode($signature);
 		$this->debug_text("Query: " . $queryString);
 						
-		$req =& new HTTP_Request($this->EC2_METHOD . '://' . $this->EC2_HOST . '/?' . $queryString);
+		$req =& new HTTP_Request2($this->EC2_METHOD . '://' . $this->EC2_HOST . '/?' . $queryString);
 		$req->setMethod($verb);
-		$req->sendRequest();		
+		$resp = $req->send();
 		
-		$this->_responseContentType = $req->getResponseHeader("Content-Type");
+		$this->_responseContentType = $resp->getHeader("Content-Type");
 		if($this->_responseContentType == '') $this->_responseContentType = 'text/xml';
-		$this->_responseCode = $req->getResponseCode();
+		$this->_responseCode = $resp->getStatus();
 		$this->debug_text('code: ' . $this->_responseCode);
 		$this->debug_text('type: ' . $this->_responseContentType);
-		$this->debug_text($req->getResponseBody());
+		$this->debug_text($resp->getBody());
 
-		return $req->getResponseBody();
+		return $resp->getBody();
 	}
 	
 
