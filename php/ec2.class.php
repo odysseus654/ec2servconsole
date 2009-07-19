@@ -43,7 +43,7 @@ class ec2 {
 	// The API access point URL
 	var $EC2_METHOD = 'http';				// use https if your php installation supports it
 	var $EC2_HOST = 'ec2.amazonaws.com';
-	var $EC2_VERSION = '2008-08-08';
+	var $EC2_VERSION = '2009-04-04';
 
 	// set to true to echo debug info
 	var $_debug = false;
@@ -67,11 +67,11 @@ class ec2 {
 	*/
 	function ec2($options = NULL)
 	{
-		if(!defined('DATE_ISO8601'))
+		if(!defined('DATE_AWS'))
 		{
-			define('DATE_ISO8601', 'Y\-m\-d\TH\:i\:s\Z');
+			define('DATE_AWS', 'Y\-m\-d\TH\:i\:s\Z');
 		}
-		$this->httpDate = gmdate(DATE_ISO8601);
+		$this->httpDate = gmdate(DATE_AWS);
 		
 		// REQUIRES PEAR PACKAGE
 		// get with "pear install Crypt_HMAC"
@@ -183,6 +183,19 @@ class ec2 {
 	}
 
 	/*
+	* Method: describeImageAttribute
+	* Retrieves an individual attribute of a registered AMI
+	*
+	* Parameters:
+	* imageId - AMI image to query
+	* attr - attribute to retrieve (launchPermission, productCodes, kernel, ramdisk, blockDeviceMapping,platform)
+	*/
+	function describeImageAttribute($imageID, $attr)
+	{
+		return $this->sendRequest('DescribeImageAttribute', 'GET', array('ImageId' => $imageID, 'Attribute' => $attr));
+	}
+
+	/*
 	* Method: setProductCode
 	* Associates a product code with an AMI image
 	*
@@ -194,18 +207,6 @@ class ec2 {
 	{
 		return $this->sendRequest('ModifyImageAttribute', 'POST',
 			array('ImageId' => $imageID, 'Attribute' => 'productCodes', 'ProductCode.1' => $productCode));
-	}
-
-	/*
-	* Method: getProductCode
-	* Retrieves the product code for an AMI image
-	*
-	* Parameters:
-	* imageId - AMI image to query
-	*/
-	function getProductCode($imageID)
-	{
-		return $this->sendRequest('DescribeImageAttribute', 'GET', array('ImageId' => $imageID, 'Attribute' => 'productCodes'));
 	}
 
 	/*
@@ -223,21 +224,9 @@ class ec2 {
 		$parms = array('ImageID' => $imageID, 'Attribute' => 'launchPermission', 'OperationType' => $optype);
 
 		$this->addParmArray($parms, 'UserId', $users);
-		$this->addParmArray($parms, 'UserGroup', $usergroups);
+		$this->addParmArray($parms, 'Group', $usergroups);
 
 		return $this->sendRequest('ModifyImageAttribute', 'POST', $parms);
-	}
-
-	/*
-	* Method: describeLaunchPermissions
-	* Retrieves the launch permissions for an AMI image
-	*
-	* Parameters:
-	* imageId - AMI image to query
-	*/
-	function describeLaunchPermissions($imageID)
-	{
-		return $this->sendRequest('DescribeImageAttribute', 'GET', array('ImageId' => $imageID, 'Attribute' => 'launchPermission'));
 	}
 
 	/*
@@ -320,7 +309,7 @@ class ec2 {
 		}
 		if(isset($options['userData']))
 		{
-			$parms['UserData'] = base64_encode($options['userData']);
+			$parms['Data'] = base64_encode($options['userData']);
 		}
 		if(isset($options['type']))
 		{
@@ -341,7 +330,14 @@ class ec2 {
 
 		if(isset($options['group']))
 		{
-			$this->addParmArray($parms, 'SecurityGroup', $options['group']);
+			$this->addParmArray($parms, 'groupId', $options['group']);
+		}
+		if(isset($options['monitor']))
+		{
+			if($options['monitor'])
+			{
+				$parms['Monitoring.Enabled'] = 'true';
+			}
 		}
 
 		return $this->sendRequest('RunInstances', 'POST', $parms);
@@ -560,6 +556,380 @@ class ec2 {
 			array('GroupName' => $name, 'SourceSecurityGroupOwnerId' => $srcUser,
 				'SourceSecurityGroupName' => $srcGroup));
 	}
+	
+	/*
+	* Method: describeAvailabilityZones
+	* Describes the availability zones currently available to the user
+	*
+	* Parameters:
+	* zones (optional) - zone or list of zones to display
+	*/
+	function describeAvailabilityZones($zones = NULL)
+	{
+		$parms = array();
+		$this->addParmArray($parms, 'ZoneName', $zones);
+		return $this->sendRequest('DescribeAvailabilityZones', 'GET', $parms);
+	}
+
+	/*
+	* Method: describeRegions
+	* Describes the regions currently available to the user
+	*
+	* Parameters:
+	* regions (optional) - region or list of regions to display
+	*/
+	function describeRegions($regions = NULL)
+	{
+		$parms = array();
+		$this->addParmArray($parms, 'RegionName', $regions);
+		return $this->sendRequest('DescribeRegions', 'GET', $parms);
+	}
+	
+	/*
+	* Method: describeBundleTasks
+	* Describes the state of the current Windows AMI bundling tasks in progress
+	*
+	* Parameters:
+	* bundleId (optional) - the ID of the bundle operation to describe
+	*/
+	function describeBundleTasks($bundleId = NULL)
+	{
+		$parms = array();
+		if($bundleId != NULL)
+		{
+			$parms['BundleId'] = $bundleId;
+		}
+		return $this->sendRequest('DescribeBundleTasks', 'GET', $parms);
+	}
+
+	/*
+	* Method: allocateAddress
+	* Acquires an elastic IP address for use with your account
+	*/
+	function allocateAddress()
+	{
+		return $this->sendRequest('AllocateAddress', 'POST', array());
+	}
+
+	/*
+	* Method: describeAddresses
+	* lastic IP addresses assigned to your account or provides information about a specific address
+	*
+	* Parameters:
+	* publicIp (optional) - IP or list of IPs to display
+	*/
+	function describeAvailabilityZones($publicIp = NULL)
+	{
+		$parms = array();
+		$this->addParmArray($parms, 'PublicIp', $publicIp);
+		return $this->sendRequest('DescribeAddresses', 'GET', $parms);
+	}
+
+	/*
+	* Method: associateAddress
+	* Associates an elastic IP address with an instance
+	*
+	* Parameters:
+	* instanceID - the instance to associate
+	* publicIp - the public IP to associate
+	*/
+	function associateAddress($instanceID, $publicIp)
+	{
+		return $this->sendRequest('AssociateAddress', 'POST',
+			array('InstanceId' => $instanceID, 'PublicIp' => $publicIp));
+	}
+
+	/*
+	* Method: disassociateAddress
+	* Disassociates the specified elastic IP address from the instance to which it is assigned
+	*
+	* Parameters:
+	* publicIp - the public IP to associate
+	*/
+	function disassociateAddress($publicIp)
+	{
+		return $this->sendRequest('DisassociateAddress', 'POST', array('PublicIp' => $publicIp));
+	}
+
+	/*
+	* Method: releaseAddress
+	* Releases an elastic IP address associated with your account
+	*
+	* Parameters:
+	* publicIp - the public IP to associate
+	*/
+	function releaseAddress($publicIp)
+	{
+		return $this->sendRequest('ReleaseAddress', 'POST', array('PublicIp' => $publicIp));
+	}
+
+	/*
+	* Method: createVolume
+	* Creates a new Amazon EBS volume to which any Amazon EC2 instance can attach within the same Availability Zone
+	*
+	* Parameters:
+	* size - size of the volume (in GB)
+	* snapshotID - the snapshot from which to create the volume (required?!?)
+	* zone - the availability zone to place the volume
+	*/
+	function createVolume($size, $zone, $snapshotID = null)
+	{
+		$parms = array();
+		$parms['Size'] = $size;
+		$parms['AvailabilityZone'] = $zone
+		if($snapshotID != NULL)
+		{
+			$parms['SnapshotID'] = $snapshotID;
+		}
+		return $this->sendRequest('CreateVolume', 'POST', $parms);
+	}
+
+	/*
+	* Method: describeVolumes
+	* Describes the specified Amazon EBS volumes that you own
+	*
+	* Parameters:
+	* volumeId (optional) - the volume to describe
+	*/
+	function describeVolumes($volumeID = null)
+	{
+		$parms = array();
+		if($volumeID != NULL)
+		{
+			$parms['VolumeID'] = $volumeID;
+		}
+		return $this->sendRequest('DescribeVolumes', 'GET', $parms);
+	}
+
+	/*
+	* Method: attachVolume
+	* Attaches an Amazon EBS volume to a running instance and exposes it as the specified device
+	*
+	* Parameters:
+	* instanceID - the instance to attach to
+	* volumeID - the volume to attach
+	* device - the device on the instance to attach to
+	*/
+	function attachVolume($instanceID, $volumeID, $device)
+	{
+		return $this->sendRequest('AttachVolume', 'POST',
+			array('InstanceId' => $instanceID, 'VolumeId' => $volumeID, 'Device' => $device));
+	}
+
+	/*
+	* Method: detachVolume
+	* Detaches an Amazon EBS volume from an instance
+	*
+	* Parameters:
+	* volumeID - the volume to detach
+	* force (optional) - force the detachment, perhaps causing dataloss
+	* instanceID (optional) - the instance to detach from
+	* device (optional) - the device on the instance to detach from
+	*/
+	function detachVolume($volumeID, $force = false, $instanceID = null, $device = null)
+	{
+		$parms = array();
+		$parms['VolumeId'] = $volumeID;
+		if($force)
+		{
+			$parms['Force'] = 'true';
+		}
+		if($instanceID != null)
+		{
+			$parms['InstanceId'] = $instanceID;
+		}
+		if($device != null)
+		{
+			$parms['Device'] = $device;
+		}
+		return $this->sendRequest('DetachVolume', 'POST', $parms);
+	}
+
+	/*
+	* Method: deleteVolume
+	* Deletes an Amazon EBS volume that you own
+	*
+	* Parameters:
+	* volumeID - the volume to delete
+	*/
+	function deleteVolume($volumeID)
+	{
+		return $this->sendRequest('DeleteVolume', 'POST', array('VolumeId' => $volumeID));
+	}
+
+	/*
+	* Method: createSnapshot
+	* Creates a snapshot of an Amazon EBS volume and stores it in Amazon S3
+	*
+	* Parameters:
+	* volumeID - the volume to snapshot
+	*/
+	function createSnapshot($volumeID)
+	{
+		return $this->sendRequest('CreateSnapshot', 'POST', array('VolumeId' => $volumeID));
+	}
+
+	/*
+	* Method: describeSnapshots
+	* Describes the status of Amazon EBS snapshots
+	*
+	* Parameters:
+	* snapshotID (optional) - the snapshot or list of snapshots to describe
+	*/
+	function describeSnapshots($snapshotID = null)
+	{
+		$parms = array();
+		$this->addParmArray($parms, 'SnapshotId', $publicIp);
+		return $this->sendRequest('DescribeSnapshots', 'GET', $parms);
+	}
+
+	/*
+	* Method: deleteSnapshot
+	* Deletes a snapshot of an Amazon EBS volume that you own
+	*
+	* Parameters:
+	* snapshotID - the snapshot to delete
+	*/
+	function deleteSnapshot($snapshotID)
+	{
+		return $this->sendRequest('DeleteSnapshot', 'POST', array('SnapshotId' => $snapshotID));
+	}
+
+	/*
+	* Method: bundleInstance
+	* Bundles the Windows instance
+	*
+	* Parameters:
+	* instanceID - the instance to bundle
+	* accessKey - the S3 access key of the bucket to store the instance
+	* secretKey - the S3 secret key of the bucket to store the instance
+	* bucket - the S3 bucket to store the instance into
+	* prefix - the S3 prefix to prepend to the instance name
+	*/
+	function bundleInstance($instanceID, $accessKey, $bucket, $prefix, $secretKey)
+	{
+		$parms = array();
+		$parms['InstanceId'] = $instanceID;
+		$parms['Storage.S3.AWSAccessKeyId'] = $accessKey;
+		$parms['Storage.S3.Bucket'] = $bucket;
+		$parms['Storage.S3.Prefix'] = $prefix;
+		
+		$policy = '{"expiration":"' . gmdate(DATE_AWS, time()+43200) . '","conditions":[{"acl":"ec2-bundle-read"},{"bucket":"' . addslashes($bucket) . '"},["starts-with","$key","' . addslashes($prefix) . '"]]}';
+
+		$signTarget = $this->hex2b64($policy);
+		$this->debug_text("Signing String: ".var_export($signTarget,true));
+		$hasher = new Crypt_HMAC($secretKey, "sha1");
+		$signature = $this->hex2b64($hasher->hash($signTarget));
+
+		$parms['Storage.S3.UploadPolicy'] = $signTarget;
+		$parms['Storage.S3.UploadPolicySignature'] = $signature;
+		return $this->sendRequest('BundleInstance', 'POST', $parms);
+	}
+
+	/*
+	* Method: cancelBundleTask
+	* Cancels an Amazon EC2 bundling operation
+	*
+	* Parameters:
+	* bundleID - the bundle operation to cancel
+	*/
+	function cancelBundleTask($bundleID)
+	{
+		return $this->sendRequest('CancelBundleTask', 'POST', array('BundleId' => $bundleID));
+	}
+
+	/*
+	* Method: describeReservedInstancesOffering
+	* Describes Reserved Instance offerings that are available for purchase
+	*
+	* Parameters:
+	* offeringID (optional) - the reserved instance offering to describe
+	* instanceType (optional) - the instance type that the offering can be used on
+	* zone (optional) - the zone that the offering can be used on
+	* description ( optional) - the instance description
+	*/
+	function describeReservedInstancesOffering($offeringID = null, $instanceType = null, $zone = null, $description = null)
+	{
+		$parms = array();
+		if($offeringID != null)
+		{
+			$parms['ReservedInstancesOfferingId'] = $offeringID;
+		}
+		if($instanceType != null)
+		{
+			$parms['InstanceType'] = $instanceType;
+		}
+		if($zone != null)
+		{
+			$parms['AvailabilityZone'] = $zone;
+		}
+		if($description != null)
+		{
+			$parms['ProductDescription'] = $description;
+		}
+		return $this->sendRequest('DescribeReservedInstancesOfferings', 'GET', $parms);
+	}
+
+	/*
+	* Method: describeReservedInstances
+	* Describes Reserved Instances that you purchased
+	*
+	* Parameters:
+	* instancesID (optional) - instance or list of instances to describe
+	*/
+	function describeReservedInstances($instanceID = null)
+	{
+		$parms = array();
+		$this->addParmArray($parms, 'ReservedInstancesId', $instanceID);
+		return $this->sendRequest('DescribeReservedInstances', 'GET', $parms);
+	}
+
+	/*
+	* Method: purchaseReservedInstances
+	* Purchases a Reserved Instance for use with your account
+	*
+	* Parameters:
+	* offeringID - the reserved instance offering to purchase
+	* count (optional) - the number of instances to purchase
+	*/
+	function purchaseReservedInstances($offeringID, $count = 1)
+	{
+		$parms = array();
+		$parms['ReservedInstancesOfferingId.1'] = $offeringID;
+		if($count != 1)
+		{
+			$parms['InstanceCount.1'] = $count;
+		}
+		return $this->sendRequest('PurchaseReservedInstancesOffering', 'POST', $parms);
+	}
+
+	/*
+	* Method: monitorInstance
+	* Enables monitoring for a running instance
+	*
+	* Parameters:
+	* instanceID - the instance to enable monitoring for
+	*/
+	function monitorInstance($instanceID)
+	{
+		$parms = array();
+		$this->addParmArray($parms, 'InstanceId', $instanceID);
+		return $this->sendRequest('MonitorInstances', 'POST', $parms);
+	}
+
+	/*
+	* Method: unmonitorInstance
+	* Disables monitoring for a running instance
+	*
+	* Parameters:
+	* instanceID - the instance to disable monitoring for
+	*/
+	function unmonitorInstance($instanceID)
+	{
+		$parms = array();
+		$this->addParmArray($parms, 'InstanceId', $instanceID);
+		return $this->sendRequest('UnmonitorInstances', 'POST', $parms);
+	}
 
 	/*
 	* Method: hex2b64
@@ -573,8 +943,7 @@ class ec2 {
 		}
 		return base64_encode($raw);
 	}
-		
-		
+	
 	/*
 	* Method: debug_text
 	* Echoes debug information to the browser.  Set this->debug to false for production use
