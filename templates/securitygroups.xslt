@@ -19,7 +19,7 @@
 	limitations under the License.
 -->
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-	xmlns:ec2="http://ec2.amazonaws.com/doc/2008-08-08/" version="1.0">
+	xmlns:ec2="http://ec2.amazonaws.com/doc/2009-04-04/" version="1.0">
 	<xsl:param name="sort" />
 	<xsl:param name="sortdir" />
 	<xsl:param name="action" />

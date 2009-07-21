@@ -243,15 +243,6 @@ function xml2php($xml)		// I *really* miss domxml_xmltree!
 
 function xml2phpHelper($node)
 {
-	if($node->nodeType == XML_TEXT_NODE)
-	{
-		return $node->wholeText;
-	}
-	else if($node->nodeType != XML_ELEMENT_NODE)
-	{
-		return null;
-	}
-	
 	$result = array();
 	$hasContent = false;
 	foreach ($node->attributes as $attrName => $attrNode)
@@ -266,15 +257,17 @@ function xml2phpHelper($node)
 		for($i=0; $i < $children->length; $i++)
 		{
 			$child = $children->item($i);
-			$childResult = xml2phpHelper($child);
-			if(!is_array($childResult) && $child->nodeType != XML_ELEMENT_NODE)
+			if($child->nodeType == XML_TEXT_NODE)
 			{
-				$childResult = trim($childResult);
+				$childResult = trim($child->wholeText);
 				if($childResult != '')
 				{
 					$body = $childResult;
 				}
-			} else {
+			}
+			else if($child->nodeType == XML_ELEMENT_NODE)
+			{
+				$childResult = xml2phpHelper($child);
 				$hasContent = true;
 				$childName = $child->nodeName;
 				if(!isset($result[$childName]))

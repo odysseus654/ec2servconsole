@@ -26,20 +26,28 @@ var CMD_FAILMSG  = '<failed/>';
 var DEFAULT_PANE = 'ec2_images';
 
 var PANELGROUPS = {
-	default: [
+	defaults: [
 		{ icon: 'shield', name: 'ec2_securityGroups', title: 'Security Groups' },
 		{ icon: 'cd', name: 'ec2_images', title: 'Images' }
 	]
 };
 
 var PANELS = {
+	images: {
+		templ: 'images.xslt',
+		url: 'datastore.php',
+		defaults: { panel: 'list' },
+		actions: {
+			list: { }
+		}
+	},
 	ec2_images: {
 		templ: 'images.xslt',
 		url: 'ec2.php',
 		defaults: { panel: 'list' },
 		actions: {
 			list: { params: 'action=DescribeImages', title: 'Available Machine Images' },
-			detail: { params: 'action=DescribeImages&id=', title: 'Machine Image Details' },
+			detail: { params: 'action=DescribeImages&id=', title: 'Machine Image Details' }
 //			add: { params: 'action=DescribeImages&id=', templParms: {action: 'addImage'} }
 		}
 	},
@@ -333,12 +341,13 @@ function buildClassExclusion(exclDesc)
 		var supArray = [];		// array of all classes mentioned in this map
 		var exclList = [];		// array of exclusion codes in this map
 		var key, idx;
+		var thisExcl;
 		
 		// investigate and build up our support structure
 		for(key in descMap)
 		{
 			exclList.push(key);
-			var thisExcl = descMap[key];
+			thisExcl = descMap[key];
 			for(idx=0; idx < thisExcl.length; idx++)
 			{
 				if(!supMap[thisExcl[idx]])
@@ -354,7 +363,7 @@ function buildClassExclusion(exclDesc)
 		{
 			if(!AVAIL_EXCLUSIONS[key])
 			{
-				var thisExcl = descMap[key];
+				thisExcl = descMap[key];
 				
 				// create the base stylesheets
 				var sheet = new CSSStyleSheet();
@@ -414,8 +423,8 @@ function setClassExclusion(newExcl)
 	for(var idx=0; idx < thisExcl.exc.length; idx++)
 	{
 		var oldStyle = AVAIL_EXCLUSIONS[thisExcl.exc[idx]].sheet;
-		var node = oldStyle.sheet || oldStyle.styleElement;
-		node.disabled = true;
+		var oldNode = oldStyle.sheet || oldStyle.styleElement;
+		oldNode.disabled = true;
 	}
 	
 	var node = thisExcl.sheet.sheet || thisExcl.sheet.styleElement;
@@ -738,7 +747,7 @@ Panel.prototype.submitFormAction = function(submitAction, formElem, param)
 
 Panel.prototype.deletePane = function(src, descr, id, delAction)
 {
-	if(!delAction) action = 'delete';
+	if(!delAction) delAction = 'delete';
 	if(!this.def.submitActions[delAction])
 	{
 		internalAppError('attempt to issue a delete action panel ' + this.name + ' with invalid or missing action ' + delAction, 'appDelete');
@@ -790,7 +799,6 @@ function AppPane(panelName, action)
 			var wrapObj = document.createElement('A');
 			addObj.appendChild(wrapObj);
 			wrapObj.appendChild(document.createTextNode(addAction.label || addAction.title));
-			var self = this;
 			wrapObj.onclick = this.createClickAction(this.def.defaults.add);
 		}
 	}
@@ -851,7 +859,7 @@ PopupPanel.prototype.hookClosePanel = function()
 	{
 		DialogWindow.prototype.hide.apply(this);
 		self.onHideDialog();
-	}
+	};
 };
 
 PopupPanel.prototype.onHideDialog = function()
@@ -876,7 +884,7 @@ function appSetPanel(panelName,action)
 {
 	if(currentAppPane)
 	{
-		if((currentAppPane.name == panelName || currentAppPane.def === panelName) && currentAppPanel.actionName == action)
+		if((currentAppPane.name == panelName || currentAppPane.def === panelName) && currentAppPane.actionName == action)
 		{
 			// no change, just return
 			return currentAppPane;

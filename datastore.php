@@ -50,30 +50,41 @@ function syncAmazon()
 	
 	// cleanup and filter the results a bit
 	$kernels = array();
+	$images = array();
 	$item = $resptree['imagesSet']['item'];
 	if(isset($item[0]))
 	{
 		foreach($item as $idx => $value)
 		{
-			if($value['imageState'] == 'available' && $value['isPublic'] == 'true' && $value['imageType'] != 'machine')
+			if($value['imageType'] == 'machine')
+			{
+				$imageId = $value['imageId'];
+				unset($value['imageId']);
+				$images[$imageId] = $value;
+			}
+			else if($value['imageState'] == 'available' && $value['isPublic'] == 'true')
 			{
 				$imageId = $value['imageId'];
 				unset($value['isPublic']);
 				unset($value['imageState']);
 				unset($value['imageId']);
-//				unset($value['imageOwnerId']);
 				$value['status'] = 'added';
 				$kernels[$imageId] = $value;
 			}
 		}
 	} else {
-		if($item['imageState'] == 'available' && $item['isPublic'] == 'true' && $item['imageType'] != 'machine')
+		if($item['imageType'] == 'machine')
+		{
+			$imageId = $item['imageId'];
+			unset($item['imageId']);
+			$images[$imageId] = $item;
+		}
+		else if($item['imageState'] == 'available' && $item['isPublic'] == 'true')
 		{
 			$imageId = $item['imageId'];
 			unset($item['isPublic']);
 			unset($item['imageState']);
 			unset($item['imageId']);
-//			unset($item['imageOwnerId']);
 			$item['status'] = 'added';
 			$kernels[$imageId] = $item;
 		}
@@ -139,8 +150,78 @@ function syncAmazon()
 		}
 		$query = mysql_query($cmd, $session->dbConnect()) or $session->sqlError('syncAmazon', 'synchronize a kernel');
 	}
-	
-	print_r($kernels);
+
+	// check the registered images to make sure they are all still valid
+	$query = mysql_query(
+		'select `amazonID`, `location`, `attributes`, `arch` from `' . $session->DB_prefix . 'images` where `accountID`=\'' . mysql_real_escape_string($session->accountID) . '\'', $session->dbConnect())
+	or $session->sqlError('syncAmazon', 'query the list of images');
+
+	while($row = mysql_fetch_assoc($query))
+	{
+		$imageId = $row['amazonID'];
+		if($images[$imageId])
+		{
+			$item = $images[$imageId];
+			if($item['imageLocation'] != $row['location']
+				|| $item['architecture'] != $row['arch']
+				|| (!!stristr($row['attributes'], 'amazon') != ($item['imageOwnerId'] != 'amazon'))
+				|| (!!stristr($row['attributes'], 'paid') != isset($item['productCodes']))
+				|| (!!stristr($row['attributes'], 'public') != ($item['isPublic'] == 'true'))
+				|| (!!stristr($row['attributes'], 'windows') != ($item['platform'] == 'windows')))
+			{
+				$images[$imageId]['status'] = 'modified';
+			}
+		} else {
+			$images[$imageId] = array( 'status' => 'deleted' );
+		}
+	}
+	mysql_free_result($query) or $session->sqlError('syncAmazon', 'free query of images');
+
+	foreach($images as $amazonId => $item)
+	{
+		$attr = '';
+		if($item['imageOwnerId'] == 'amazon')
+		{
+			if($attr != '') $attr .= ',';
+			$attr .= 'amazon';
+		}
+		if(isset($item['productCodes']))
+		{
+			if($attr != '') $attr .= ',';
+			$attr .= 'paid';
+		}
+		if($item['isPublic'] == 'true')
+		{
+			if($attr != '') $attr .= ',';
+			$attr .= 'public';
+		}
+		if($item['platform'] == 'windows')
+		{
+			if($attr != '') $attr .= ',';
+			$attr .= 'windows';
+		}
+		
+		switch($item['status'])
+		{
+			case 'deleted':
+				$cmd = 'delete from `' . $session->DB_prefix . 'images` where `amazonID`=\'' . mysql_real_escape_string($amazonId) . '\' and `accountID`=\'' . mysql_real_escape_string($session->accountID) . '\'';
+				break;
+			case 'modified':
+				$cmd = 'update `' . $session->DB_prefix . 'images` set `location`=\'' . mysql_real_escape_string($item['imageLocation']) .
+					'\',`attributes`=\'' . ($attr == '' ? 'null' : mysql_real_escape_string($attr)) .
+					'\',`arch`=\'' . mysql_real_escape_string($item['architecture']) .
+					'\' where `amazonId`=\'' . mysql_real_escape_string($amazonId) . '\' and `accountID`=\'' . mysql_real_escape_string($session->accountID) . '\'';
+				break;
+		}
+		$query = mysql_query($cmd, $session->dbConnect()) or $session->sqlError('syncAmazon', 'synchronize an image');
+	}
+}
+
+switch(strtolower(arg('action')))
+{
+case 'sync':
+	syncAmazon();
+	break;
 }
 
 syncAmazon();

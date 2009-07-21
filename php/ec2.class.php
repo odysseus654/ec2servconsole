@@ -618,7 +618,7 @@ class ec2 {
 	* Parameters:
 	* publicIp (optional) - IP or list of IPs to display
 	*/
-	function describeAvailabilityZones($publicIp = NULL)
+	function describeAddresses($publicIp = NULL)
 	{
 		$parms = array();
 		$this->addParmArray($parms, 'PublicIp', $publicIp);
@@ -676,7 +676,7 @@ class ec2 {
 	{
 		$parms = array();
 		$parms['Size'] = $size;
-		$parms['AvailabilityZone'] = $zone
+		$parms['AvailabilityZone'] = $zone;
 		if($snapshotID != NULL)
 		{
 			$parms['SnapshotID'] = $snapshotID;
