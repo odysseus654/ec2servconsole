@@ -18,12 +18,13 @@
 	See the License for the specific language governing permissions and
 	limitations under the License.
 -->
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-	xmlns:ec2="http://ec2.amazonaws.com/doc/2009-04-04/" version="1.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:ec2="http://ec2.amazonaws.com/doc/2009-04-04/" version="1.0">
 	<xsl:param name="sort" />
 	<xsl:param name="sortdir" />
 	<xsl:param name="pageno" select="'1'" />
 	<xsl:param name="rowsperpage" select="'100'" />
+	<xsl:variable name="minpos" select="$rowsperpage * ($pageno - 1)" />
+	<xsl:variable name="maxpos" select="$minpos + $rowsperpage - 1" />
 	
 	<xsl:template match="ec2:requestId"></xsl:template>
 
@@ -31,14 +32,16 @@
 		<xsl:param name="col" />
 		<xsl:param name="title" select="$col" />
 		
-		<th onclick="panelSort(this, '{$col}')" title="Sort by this field" style="cursor: default">
+		<th onclick="panelSort(this, '{$col}')" title="Sort by this field" style="cursor: pointer">
 			<xsl:if test="$sort = $col">
 				<xsl:choose>
 					<xsl:when test="$sortdir='d'">
 						<xsl:attribute name="class">sortdn</xsl:attribute>
+						<img src="images/silk/bullet_arrow_down.png" />
 					</xsl:when>
 					<xsl:otherwise>
 						<xsl:attribute name="class">sortup</xsl:attribute>
+						<img src="images/silk/bullet_arrow_up.png" />
 					</xsl:otherwise>
 				</xsl:choose>
 			</xsl:if>
@@ -58,12 +61,32 @@
 	</xsl:template>
 	
 	<xsl:template match="ec2:imagesSet">
-		<xsl:variable name="numpages" select="floor((((count(./ec2:item)) - 1) div $rowsperpage) + 1)" />
-		<xsl:variable name="minpos" select="$rowsperpage * ($pageno - 1)" />
-		<xsl:variable name="maxpos" select="$minpos + $rowsperpage - 1" />
-		Page <xsl:value-of select="$pageno" /> of <xsl:value-of select="$numpages" />
+		<xsl:variable name="numitems" select="count(ec2:item[ec2:imageType = 'machine'])" />
+		<xsl:variable name="numpages" select="floor((($numitems - 1) div $rowsperpage) + 1)" />
+		<xsl:if test="$numpages &gt; 1">
+			<div style="text-align:center">
+				<xsl:if test="$pageno &gt; 2">
+					<img src="images/silk/resultset_first.png" alt="First" style="cursor:pointer" onclick="panelReplay(this, {{pageno:1}})" />
+					<span style="width:100">&#160;</span>
+				</xsl:if>
+				<xsl:if test="$pageno &gt; 1">
+					<img src="images/silk/resultset_previous.png" alt="Previous" style="cursor:pointer" onclick="panelReplay(this, {{pageno:{$pageno - 1}}})" />
+					<span style="width:100">&#160;</span>
+				</xsl:if>
+				Page <xsl:value-of select="$pageno" /> of <xsl:value-of select="$numpages" />
+				(<xsl:value-of select="$numitems" /> items total)
+				<xsl:if test="$pageno &lt; $numpages">
+					<span style="width:100">&#160;</span>
+					<img src="images/silk/resultset_next.png" alt="Next" style="cursor:pointer" onclick="panelReplay(this, {{pageno:{$pageno + 1}}})" />
+				</xsl:if>
+				<xsl:if test="$pageno &lt; $numpages - 1">
+					<span style="width:100">&#160;</span>
+					<img src="images/silk/resultset_last.png" alt="Last" style="cursor:pointer" onclick="panelReplay(this, {{pageno:{$numpages}}})" />
+				</xsl:if>
+			</div>
+		</xsl:if>
 
-		<table border="1">
+		<table border="1" align="center" width="98%">
 			<tr>
 				<xsl:call-template name="colSortHdr">
 					<xsl:with-param name="col" select="'id'" />
@@ -84,74 +107,68 @@
 				<th></th>
 			</tr>
 			
+			<xsl:variable name="sortorder">
+				<xsl:choose>
+					<xsl:when test="$sortdir='d'">descending</xsl:when>
+					<xsl:otherwise>ascending</xsl:otherwise>
+				</xsl:choose>
+			</xsl:variable>
 			<xsl:choose>
 				<xsl:when test="$sort = 'id'">
-					<xsl:choose>
-						<xsl:when test="$sortdir='d'">
-							<xsl:apply-templates select="ec2:item[position() &gt;= $minpos and position() &lt;= $maxpos]" mode="imagesSet">
-								<xsl:sort select="ec2:imageId" order="descending" />
-							</xsl:apply-templates>
-						</xsl:when>
-						<xsl:otherwise>
-							<xsl:apply-templates select="ec2:item[position() &gt;= $minpos and position() &lt;= $maxpos]" mode="imagesSet">
-								<xsl:sort select="ec2:imageId" order="ascending" />
-							</xsl:apply-templates>
-						</xsl:otherwise>
-					</xsl:choose>
+					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine']" mode="imagesSet">
+						<xsl:sort select="ec2:imageId" order="{$sortorder}" />
+					</xsl:apply-templates>
 				</xsl:when>
 				<xsl:when test="$sort = 'loc'">
-					<xsl:choose>
-						<xsl:when test="$sortdir='d'">
-							<xsl:apply-templates select="ec2:item[position() &gt;= $minpos and position() &lt;= $maxpos]" mode="imagesSet">
-								<xsl:sort select="ec2:imageLocation" order="descending" />
-							</xsl:apply-templates>
-						</xsl:when>
-						<xsl:otherwise>
-							<xsl:apply-templates select="ec2:item[position() &gt;= $minpos and position() &lt;= $maxpos]" mode="imagesSet">
-								<xsl:sort select="ec2:imageLocation" order="ascending" />
-							</xsl:apply-templates>
-						</xsl:otherwise>
-					</xsl:choose>
+					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine']" mode="imagesSet">
+						<xsl:sort select="ec2:imageLocation" order="{$sortorder}" />
+					</xsl:apply-templates>
 				</xsl:when>
 				<xsl:when test="$sort = 'arch'">
-					<xsl:choose>
-						<xsl:when test="$sortdir='d'">
-							<xsl:apply-templates select="ec2:item[position() &gt;= $minpos and position() &lt;= $maxpos]" mode="imagesSet">
-								<xsl:sort select="ec2:architecture" order="descending" />
-							</xsl:apply-templates>
-						</xsl:when>
-						<xsl:otherwise>
-							<xsl:apply-templates select="ec2:item[position() &gt;= $minpos and position() &lt;= $maxpos]" mode="imagesSet">
-								<xsl:sort select="ec2:architecture" order="ascending" />
-							</xsl:apply-templates>
-						</xsl:otherwise>
-					</xsl:choose>
+					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine']" mode="imagesSet">
+						<xsl:sort select="ec2:platform" order="{$sortorder}" />
+						<xsl:sort select="ec2:architecture" order="{$sortorder}" />
+					</xsl:apply-templates>
 				</xsl:when>
 				<xsl:when test="$sort = 'owner'">
-					<xsl:choose>
-						<xsl:when test="$sortdir='d'">
-							<xsl:apply-templates select="ec2:item[position() &gt;= $minpos and position() &lt;= $maxpos]" mode="imagesSet">
-								<xsl:sort select="ec2:imageOwnerId" order="descending" />
-							</xsl:apply-templates>
-						</xsl:when>
-						<xsl:otherwise>
-							<xsl:apply-templates select="ec2:item[position() &gt;= $minpos and position() &lt;= $maxpos]" mode="imagesSet">
-								<xsl:sort select="ec2:imageOwnerId" order="ascending" />
-							</xsl:apply-templates>
-						</xsl:otherwise>
-					</xsl:choose>
+					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine']" mode="imagesSet">
+						<xsl:sort select="ec2:imageOwnerId" order="{$sortorder}" />
+					</xsl:apply-templates>
 				</xsl:when>
 				<xsl:otherwise>
-					<xsl:apply-templates select="ec2:item[position() &gt;= $minpos and position() &lt;= $maxpos]" mode="imagesSet" >
+					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine']" mode="imagesSet" >
 						<xsl:sort select="ec2:imageId" order="descending"/>
 					</xsl:apply-templates>
 				</xsl:otherwise>
 			</xsl:choose>
 		</table>
+
+		<xsl:if test="$numpages &gt; 1">
+			<div style="text-align:center">
+				<xsl:if test="$pageno &gt; 2">
+					<img src="images/silk/resultset_first.png" alt="First" onclick="panelReplay(this, {{pageno:1}})" />
+					<span style="width:100">&#160;</span>
+				</xsl:if>
+				<xsl:if test="$pageno &gt; 1">
+					<img src="images/silk/resultset_previous.png" alt="Previous" onclick="panelReplay(this, {{pageno:{$pageno - 1}}})" />
+					<span style="width:100">&#160;</span>
+				</xsl:if>
+				Page <xsl:value-of select="$pageno" /> of <xsl:value-of select="$numpages" />
+				(<xsl:value-of select="$numitems" /> items total)
+				<xsl:if test="$pageno &lt; $numpages">
+					<span style="width:100">&#160;</span>
+					<img src="images/silk/resultset_next.png" alt="Next" onclick="panelReplay(this, {{pageno:{$pageno + 1}}})" />
+				</xsl:if>
+				<xsl:if test="$pageno &lt; $numpages - 1">
+					<span style="width:100">&#160;</span>
+					<img src="images/silk/resultset_last.png" alt="Last" onclick="panelReplay(this, {{pageno:{$numpages}}})" />
+				</xsl:if>
+			</div>
+		</xsl:if>
 	</xsl:template>
 	
 	<xsl:template match="ec2:item" mode="imagesSet">
-		<xsl:if test="ec2:imageType = 'machine'">
+		<xsl:if test="position() &gt;= $minpos and position() &lt;= $maxpos">
 			<tr>
 				<xsl:choose>
 					<xsl:when test="ec2:imageState != 'available'">

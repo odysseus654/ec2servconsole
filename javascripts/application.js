@@ -612,7 +612,7 @@ Panel.prototype.sort = function(thElem, sort)
 {
 	if(!this.query || !this.query.isComplete)
 	{
-		internalAppError('attempt to sort with a nonexistant or non-rendable query', 'panelSort');
+		internalAppError('attempt to sort with a nonexistant or non-rendable query', 'Panel.sort');
 		return;
 	}
 	var sortdir = (thElem.className == 'sortup') ? 'd' : 'u';
@@ -620,6 +620,24 @@ Panel.prototype.sort = function(thElem, sort)
 	var ctx = panelContext[this.contextId];
 	ctx.sort = sort;
 	ctx.sortdir = sortdir;
+
+	this.rexlateAndReplace();
+};
+
+// called from within the page, re-renders the page with different template parameters
+Panel.prototype.replay = function(elem, props)
+{
+	if(!this.query || !this.query.isComplete)
+	{
+		internalAppError('attempt to re-display a nonexistant or non-rendable query', 'Panel.replay');
+		return;
+	}
+	if(!panelContext[this.contextId]) panelContext[this.contextId] = {};
+	var ctx = panelContext[this.contextId];
+	for(key in props)
+	{
+		ctx[key] = props[key];
+	}
 
 	this.rexlateAndReplace();
 };
@@ -916,6 +934,18 @@ function panelSort(thElem, sort)
 		return;
 	}
 	pane.sort(thElem, sort);
+}
+
+// called from within the page, re-renders the page with different template parameters
+function panelReplay(elem, props)
+{
+	var pane = PopupPanel.activePanel(elem);
+	if(!pane)
+	{
+		internalAppError('attempt to re-display with a nonexistant panel', 'panelReplay');
+		return;
+	}
+	pane.replay(elem, props);
 }
 
 // Refresh the current pane with fresh data
