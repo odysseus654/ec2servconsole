@@ -23,7 +23,7 @@ var CMD_LOADMSG  = '<loading/>';
 var CMD_RELOADMSG = '<reloading/>';
 var CMD_FAILMSG  = '<failed/>';
 
-var DEFAULT_PANE = 'ec2_images';
+var DEFAULT_PANE = 'images';
 
 var PANELGROUPS = {
 	defaults: [
@@ -38,7 +38,8 @@ var PANELS = {
 		url: 'datastore.php',
 		defaults: { panel: 'list' },
 		actions: {
-			list: { }
+			list: { params: 'action=images', title: 'Current Machine Images' },
+			sync: { params: 'action=sync', title: 'Operation: db sync' }
 		}
 	},
 	ec2_images: {
@@ -607,23 +608,6 @@ Panel.prototype.rexlateAndReplace = function()
 	}
 };
 
-// called from a sortable TH element, examine the className to determine whether sorting is currently in progress on this element
-Panel.prototype.sort = function(thElem, sort)
-{
-	if(!this.query || !this.query.isComplete)
-	{
-		internalAppError('attempt to sort with a nonexistant or non-rendable query', 'Panel.sort');
-		return;
-	}
-	var sortdir = (thElem.className == 'sortup') ? 'd' : 'u';
-	if(!panelContext[this.contextId]) panelContext[this.contextId] = {};
-	var ctx = panelContext[this.contextId];
-	ctx.sort = sort;
-	ctx.sortdir = sortdir;
-
-	this.rexlateAndReplace();
-};
-
 // called from within the page, re-renders the page with different template parameters
 Panel.prototype.replay = function(elem, props)
 {
@@ -922,18 +906,6 @@ function appPopupAction(action, panelName, param)
 	{
 		pane.xlateAndReplace(param, true);
 	}
-}
-
-// called from a sortable TH element, examine the className to determine whether sorting is currently in progress on this element
-function panelSort(thElem, sort)
-{
-	var pane = PopupPanel.activePanel(thElem);
-	if(!pane)
-	{
-		internalAppError('attempt to sort with a nonexistant panel', 'panelSort');
-		return;
-	}
-	pane.sort(thElem, sort);
 }
 
 // called from within the page, re-renders the page with different template parameters

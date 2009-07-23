@@ -15,10 +15,6 @@ a:visited { color: #666; }
 a:hover { color: #fff; background-color:#000; }
 
 /* specific to images panel */
-tr.disabled {
-  color: #777;
-}
-
 tr.paid {
   background-color: #faa;
 }
@@ -27,7 +23,7 @@ tr.amazon {
   background-color: #ffa;
 }
 
-tr.public {
+tr.private {
   background-color: #aaf;
 }
 

@@ -31,8 +31,14 @@
 	<xsl:template name="colSortHdr">
 		<xsl:param name="col" />
 		<xsl:param name="title" select="$col" />
+		<xsl:variable name="newdir">
+			<xsl:choose>
+				<xsl:when test="$sort=$col and $sortdir='d'">a</xsl:when>
+				<xsl:otherwise>d</xsl:otherwise>
+			</xsl:choose>
+		</xsl:variable>
 		
-		<th onclick="panelSort(this, '{$col}')" title="Sort by this field" style="cursor: pointer">
+		<th onclick="panelReplay(this, {{sort:'{$col}', sortdir:'{$newdir}'}})" title="Sort by this field" style="cursor: pointer">
 			<xsl:if test="$sort = $col">
 				<xsl:choose>
 					<xsl:when test="$sortdir='d'">
@@ -61,7 +67,7 @@
 	</xsl:template>
 	
 	<xsl:template match="ec2:imagesSet">
-		<xsl:variable name="numitems" select="count(ec2:item[ec2:imageType = 'machine'])" />
+		<xsl:variable name="numitems" select="count(ec2:item[ec2:imageType = 'machine' and ec2:imageState = 'available'])" />
 		<xsl:variable name="numpages" select="floor((($numitems - 1) div $rowsperpage) + 1)" />
 		<xsl:if test="$numpages &gt; 1">
 			<div style="text-align:center">
@@ -115,28 +121,28 @@
 			</xsl:variable>
 			<xsl:choose>
 				<xsl:when test="$sort = 'id'">
-					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine']" mode="imagesSet">
+					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine' and ec2:imageState = 'available']" mode="imagesSet">
 						<xsl:sort select="ec2:imageId" order="{$sortorder}" />
 					</xsl:apply-templates>
 				</xsl:when>
 				<xsl:when test="$sort = 'loc'">
-					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine']" mode="imagesSet">
+					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine' and ec2:imageState = 'available']" mode="imagesSet">
 						<xsl:sort select="ec2:imageLocation" order="{$sortorder}" />
 					</xsl:apply-templates>
 				</xsl:when>
 				<xsl:when test="$sort = 'arch'">
-					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine']" mode="imagesSet">
+					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine' and ec2:imageState = 'available']" mode="imagesSet">
 						<xsl:sort select="ec2:platform" order="{$sortorder}" />
 						<xsl:sort select="ec2:architecture" order="{$sortorder}" />
 					</xsl:apply-templates>
 				</xsl:when>
 				<xsl:when test="$sort = 'owner'">
-					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine']" mode="imagesSet">
+					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine' and ec2:imageState = 'available']" mode="imagesSet">
 						<xsl:sort select="ec2:imageOwnerId" order="{$sortorder}" />
 					</xsl:apply-templates>
 				</xsl:when>
 				<xsl:otherwise>
-					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine']" mode="imagesSet" >
+					<xsl:apply-templates select="ec2:item[ec2:imageType = 'machine' and ec2:imageState = 'available']" mode="imagesSet" >
 						<xsl:sort select="ec2:imageId" order="descending"/>
 					</xsl:apply-templates>
 				</xsl:otherwise>
@@ -171,17 +177,14 @@
 		<xsl:if test="position() &gt;= $minpos and position() &lt;= $maxpos">
 			<tr>
 				<xsl:choose>
-					<xsl:when test="ec2:imageState != 'available'">
-						<xsl:attribute name="class">disabled</xsl:attribute>
+					<xsl:when test="not(ec2:isPublic = 'true')">
+						<xsl:attribute name="class">private</xsl:attribute>
 					</xsl:when>
 					<xsl:when test="ec2:productCodes">
 						<xsl:attribute name="class">paid</xsl:attribute>
 					</xsl:when>
 					<xsl:when test="ec2:imageOwnerId = 'amazon'">
 						<xsl:attribute name="class">amazon</xsl:attribute>
-					</xsl:when>
-					<xsl:when test="ec2:isPublic = 'true'">
-						<xsl:attribute name="class">public</xsl:attribute>
 					</xsl:when>
 				</xsl:choose>
 				<td style="wrap: nowrap">

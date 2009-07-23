@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 -- 
 -- Host: localhost
--- Generation Time: Feb 27, 2009 at 12:13 AM
+-- Generation Time: Jul 22, 2009 at 11:08 PM
 -- Server version: 5.0.27
 -- PHP Version: 5.2.6
 
@@ -37,10 +37,9 @@ CREATE TABLE `images` (
   `accountID` int(11) NOT NULL,
   `amazonId` varchar(15) NOT NULL,
   `label` varchar(60) default NULL,
+  `location` varchar(200) default NULL,
   `descr` mediumtext,
-  `attributes` set('windows','public','paid') default NULL,
-  `arch` enum('i386','x86_64') NOT NULL default 'i386',
-  `imageType` enum('kernel','ramdisk','machine') NOT NULL default 'machine',
+  `attributes` set('windows','public','paid','amazon','x86_64') default NULL,
   `kernelId` varchar(15) default NULL,
   `ramdiskId` varchar(15) default NULL,
   PRIMARY KEY  (`accountID`,`amazonId`),
@@ -55,9 +54,8 @@ CREATE TABLE `images` (
 
 CREATE TABLE `kernels` (
   `amazonId` varchar(15) NOT NULL,
-  `location` varchar(200) NOT NULL default 'none',
-  `attributes` set('paid','amazon') default NULL,
-  `arch` enum('i386','x86_64') NOT NULL default 'i386',
+  `location` varchar(200) NOT NULL,
+  `attributes` set('paid','amazon','x86_64') default NULL,
   `imageType` enum('kernel','ramdisk') NOT NULL default 'kernel',
   PRIMARY KEY  (`amazonId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;

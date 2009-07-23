@@ -32,11 +32,22 @@ $ec2svc = new EC2();
 $ec2svc->keyId = $session->AWSAccessKeyID;
 $ec2svc->secretKey = $session->AWSSecret;
 
+function quoteOrNull($str)
+{
+	if($str == null)
+	{
+		return 'null';
+	} else {
+		return "'" . mysql_real_escape_string($str) . "'";
+	}
+}
+
 // ----------------------------------------------------------------------------
 
 function syncAmazon()
 {
 	global $ec2svc, $session;
+	set_time_limit(120);		// this can take a while...
 	
 	// retrieve the list of all public images
 //	$response = $ec2svc->describeImages(null, 'amazon');
@@ -60,6 +71,8 @@ function syncAmazon()
 			{
 				$imageId = $value['imageId'];
 				unset($value['imageId']);
+				$value['status'] = '';
+				if($value['isPublic'] == 'false') $value['status'] = 'added';
 				$images[$imageId] = $value;
 			}
 			else if($value['imageState'] == 'available' && $value['isPublic'] == 'true')
@@ -77,6 +90,8 @@ function syncAmazon()
 		{
 			$imageId = $item['imageId'];
 			unset($item['imageId']);
+			$item['status'] = '';
+			if($item['isPublic'] == 'false') $value['status'] = 'added';
 			$images[$imageId] = $item;
 		}
 		else if($item['imageState'] == 'available' && $item['isPublic'] == 'true')
@@ -92,7 +107,7 @@ function syncAmazon()
 
 	// retrieve the kernels we have
 	$query = mysql_query(
-		'select `amazonID`, `location`, `attributes`, `arch`, `imageType` from `' . $session->DB_prefix . 'kernels`', $session->dbConnect())
+		'select `amazonID`, `location`, `attributes`, `imageType` from `' . $session->DB_prefix . 'kernels`', $session->dbConnect())
 	or $session->sqlError('syncAmazon', 'query the list of kernels');
 
 	while($row = mysql_fetch_assoc($query))
@@ -102,7 +117,8 @@ function syncAmazon()
 		{
 			$kernels[$imageId]['status'] = 'modified';
 			$item = $kernels[$imageId];
-			if($item['imageLocation'] == $row['location'] && $item['architecture'] == $row['arch']
+			if($item['imageLocation'] == $row['location']
+				&& (!!stristr($row['attributes'], 'x86_64') == ($item['architecture'] == 'x86_64'))
 				&& (!!stristr($row['attributes'], 'amazon') == ($item['imageOwnerId'] == 'amazon'))
 				&& (!!stristr($row['attributes'], 'paid') == isset($item['productCodes']))
 				&& $item['imageType'] == $row['imageType'])
@@ -128,24 +144,26 @@ function syncAmazon()
 			if($attr != '') $attr .= ',';
 			$attr .= 'paid';
 		}
+		if(isset($item['architecture']) && $item['architecture'] == 'x86_64')
+		{
+			if($attr != '') $attr .= ',';
+			$attr .= 'x86_64';
+		}
 		
 		switch($item['status'])
 		{
 			case 'deleted':
-				$cmd = 'delete from `' . $session->DB_prefix . 'kernels` where `amazonID`=\'' . mysql_real_escape_string($amazonId) . '\'';
+				$cmd = 'delete from `' . $session->DB_prefix . 'kernels` where `amazonID`=' . quoteOrNull($amazonId);
 				break;
 			case 'added':
-				$cmd = 'insert into `' . $session->DB_prefix . 'kernels`(`amazonID`,`location`,`attributes`,`arch`,`imageType`) ' .
-					'values(\'' . mysql_real_escape_string($amazonId) . '\',\'' . mysql_real_escape_string($item['imageLocation']) .
-					'\',\'' . ($attr == '' ? 'null' : mysql_real_escape_string($attr)) . '\',\'' . mysql_real_escape_string($item['architecture']) .
-					'\',\'' . mysql_real_escape_string($item['imageType']) . '\');';
+				$cmd = 'insert into `' . $session->DB_prefix . 'kernels`(`amazonID`,`location`,`attributes`,`imageType`) ' .
+					'values(' . quoteOrNull($amazonId) . ',' . quoteOrNull($item['imageLocation']) .
+					',' . ($attr == '' ? 'null' : quoteOrNull($attr)) . ',' . quoteOrNull($item['imageType']) . ');';
 				break;
 			case 'modified':
-				$cmd = 'update `' . $session->DB_prefix . 'kernels` set `location`=\'' . mysql_real_escape_string($item['imageLocation']) .
-					'\',`attributes`=\'' . ($attr == '' ? 'null' : mysql_real_escape_string($attr)) .
-					'\',`arch`=\'' . mysql_real_escape_string($item['architecture']) .
-					'\',`imageType`=\'' . mysql_real_escape_string($item['imageType']) .
-					'\' where `amazonId`=\'' . mysql_real_escape_string($amazonId) . '\'';
+				$cmd = 'update `' . $session->DB_prefix . 'kernels` set `location`=' . quoteOrNull($item['imageLocation']) .
+					',`attributes`=' . ($attr == '' ? 'null' : quoteOrNull($attr)) . ',`imageType`=' . quoteOrNull($item['imageType']) .
+					' where `amazonId`=' . quoteOrNull($amazonId);
 				break;
 		}
 		$query = mysql_query($cmd, $session->dbConnect()) or $session->sqlError('syncAmazon', 'synchronize a kernel');
@@ -153,7 +171,7 @@ function syncAmazon()
 
 	// check the registered images to make sure they are all still valid
 	$query = mysql_query(
-		'select `amazonID`, `location`, `attributes`, `arch` from `' . $session->DB_prefix . 'images` where `accountID`=\'' . mysql_real_escape_string($session->accountID) . '\'', $session->dbConnect())
+		'select `amazonID`, `location`, `attributes` from `' . $session->DB_prefix . 'images` where `accountID`=' . quoteOrNull($session->accountID), $session->dbConnect())
 	or $session->sqlError('syncAmazon', 'query the list of images');
 
 	while($row = mysql_fetch_assoc($query))
@@ -163,7 +181,7 @@ function syncAmazon()
 		{
 			$item = $images[$imageId];
 			if($item['imageLocation'] != $row['location']
-				|| $item['architecture'] != $row['arch']
+				|| (!!stristr($row['attributes'], 'x86_64') != ($item['architecture'] != 'x86_64'))
 				|| (!!stristr($row['attributes'], 'amazon') != ($item['imageOwnerId'] != 'amazon'))
 				|| (!!stristr($row['attributes'], 'paid') != isset($item['productCodes']))
 				|| (!!stristr($row['attributes'], 'public') != ($item['isPublic'] == 'true'))
@@ -195,26 +213,72 @@ function syncAmazon()
 			if($attr != '') $attr .= ',';
 			$attr .= 'public';
 		}
-		if($item['platform'] == 'windows')
+		if(isset($item['plaform']) && $item['platform'] == 'windows')
 		{
 			if($attr != '') $attr .= ',';
 			$attr .= 'windows';
 		}
+		if(isset($item['architecture']) && $item['architecture'] == 'x86_64')
+		{
+			if($attr != '') $attr .= ',';
+			$attr .= 'x86_64';
+		}
+		if(!isset($item['kernelId'])) $item['kernelId'] = null;
+		if(!isset($item['ramdiskId'])) $item['ramdiskId'] = null;
 		
 		switch($item['status'])
 		{
 			case 'deleted':
-				$cmd = 'delete from `' . $session->DB_prefix . 'images` where `amazonID`=\'' . mysql_real_escape_string($amazonId) . '\' and `accountID`=\'' . mysql_real_escape_string($session->accountID) . '\'';
+				$cmd = 'delete from `' . $session->DB_prefix . 'images` where `amazonID`=' . quoteOrNull($amazonId) . ' and `accountID`=' . quoteOrNull($session->accountID);
 				break;
 			case 'modified':
-				$cmd = 'update `' . $session->DB_prefix . 'images` set `location`=\'' . mysql_real_escape_string($item['imageLocation']) .
-					'\',`attributes`=\'' . ($attr == '' ? 'null' : mysql_real_escape_string($attr)) .
-					'\',`arch`=\'' . mysql_real_escape_string($item['architecture']) .
-					'\' where `amazonId`=\'' . mysql_real_escape_string($amazonId) . '\' and `accountID`=\'' . mysql_real_escape_string($session->accountID) . '\'';
+				$cmd = 'update `' . $session->DB_prefix . 'images` set `location`=' . quoteOrNull($item['imageLocation']) .
+					',`attributes`=' . ($attr == '' ? 'null' : quoteOrNull($attr)) .
+					' where `amazonId`=' . quoteOrNull($amazonId) . ' and `accountID`=' . quoteOrNull($session->accountID);
+				break;
+			case 'added':
+				$cmd = 'insert into `' . $session->DB_prefix . 'images`(`amazonID`,`location`,`attributes`,`accountID`,`kernelId`,`ramdiskId`) ' .
+					'values(' . quoteOrNull($amazonId) . ',' . quoteOrNull($item['imageLocation']) . ',' . ($attr == '' ? 'null' : quoteOrNull($attr)) .
+					',' . quoteOrNull($session->accountID) . ',' . quoteOrNull($item['kernelId']) . ',' . quoteOrNull($item['ramdiskId']) . ');';
+				break;
+			default:
+				$cmd = '';
 				break;
 		}
-		$query = mysql_query($cmd, $session->dbConnect()) or $session->sqlError('syncAmazon', 'synchronize an image');
+		if($cmd != '')
+		{
+			$query = mysql_query($cmd, $session->dbConnect()) or $session->sqlError('syncAmazon', 'synchronize an image');
+		}
 	}
+
+	header('Content-Type: text/xml');
+	echo '<?xml version="1.0" ?>' . "\n";
+	echo '<Response name="' . arg('action') . '">success</Response>';
+}
+
+function listImages()
+{
+	global $ec2svc, $session;
+
+	$query = mysql_query(
+		'select `amazonID`, `location`, `attributes`, `label`, `descr`, `kernelId`, `ramdiskId` from `' . $session->DB_prefix . 'images` where `accountID`=' . quoteOrNull($session->accountID), $session->dbConnect())
+	or $session->sqlError('listImages', 'query the list of images');
+	
+	echo '<?xml version="1.0" ?>' . "\n" .
+		'<ListImagesResponse xmlns="http://ec2servconsole.sourceforge.net/2009/DataStore">' . "\n";
+	while($row = mysql_fetch_assoc($query))
+	{
+		echo '<image><imageID>' . $row['amazonID'] . '</imageID><imageLocation>' . $row['location'] . '</imageLocation><architecture>' .
+			(!!stristr($row['attributes'], 'x86_64') ? 'x86_64' : 'i386') . '</architecture><descr>' . $row['descr'] . '</descr><kernelId>' .
+			$row['kernelId'] . '</kernelId><ramdiskId>' . $row['ramdiskId'] . '</ramdiskId>';
+		if($row['label']) echo '<name>' . $row['label'] . "</name>\n";
+		if(!!stristr($row['attributes'], 'paid')) echo '<isPaid>true</isPaid>';
+		if(!!stristr($row['attributes'], 'public')) echo '<isPublic>true</isPublic>';
+		if(!!stristr($row['attributes'], 'windows')) echo '<platform>windows</platform>';
+		echo '</image>';
+	}
+	mysql_free_result($query) or $session->sqlError('listImages', 'free query of images');
+	echo '</ListImagesResponse>';
 }
 
 switch(strtolower(arg('action')))
@@ -222,7 +286,13 @@ switch(strtolower(arg('action')))
 case 'sync':
 	syncAmazon();
 	break;
+case 'images':
+	listImages();
+	break;
+default:
+	header('Content-Type: text/xml');
+	echo '<?xml version="1.0" ?>' . "\n";
+	echo '<unknownRequest name="' . arg('action') . '"/>';
 }
 
-syncAmazon();
 ?>
