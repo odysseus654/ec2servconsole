@@ -56,6 +56,7 @@ class Session
 	var $accountID = 0;
 	var $AWSAccessKeyID = '';
 	var $AWSSecret = '';
+	var $AWSAccountID = null;
 
 	function dbConnect()
 	{
@@ -146,13 +147,14 @@ class Session
 		mysql_free_result($query) or $this->sqlError('onLogin', 'free query of logins');
 		
 		$query = mysql_query(
-			'select `accessKeyID`,`secret` from `' . $this->DB_prefix . 'account` where `accountID`=\'' . mysql_real_escape_string($this->accountID) . '\'', $this->dbConnect())
+			'select `accessKeyID`,`secret`,`amazonAccount` from `' . $this->DB_prefix . 'account` where `accountID`=\'' . mysql_real_escape_string($this->accountID) . '\'', $this->dbConnect())
 		or $this->sqlError('onLogin', 'query the account');
 		
 		$row = mysql_fetch_assoc($query);
 		if(!$row) return false;
 		$this->AWSAccessKeyID = $row['accessKeyID'];
 		$this->AWSSecret = $row['secret'];
+		$this->AWSAccountID = $row['amazonAccount'];
 		mysql_free_result($query) or $this->sqlError('onLogin', 'free query of account');
 		
 		return true;
@@ -162,6 +164,36 @@ class Session
 	// Called whenever an sql error occurs, throw a descriptive error and get out
 	{
 		die('fail,Could not ' . $ctx . ': ' . mysql_error($this->dbh));
+	}
+	
+	function getAccountId($ec2svc)
+	{
+		if($this->AWSAccountID == null)
+		{
+			$response = $ec2svc->describeSecurityGroups(null, null);
+			if($ec2svc->getResponseCode() != 200)
+			{
+				return null;
+			}
+			$resptree = xml2php($response);
+			if(!isset($resptree['securityGroupInfo']) || !isset($resptree['securityGroupInfo']['item']))
+			{
+				return null;
+			}
+			$items = $resptree['securityGroupInfo']['item'];
+			if(isset($items[0]))
+			{
+				$item = $items[0];
+			} else {
+				$item = $items;
+			}
+
+			$this->AWSAccountID = $item['ownerId'];
+			$query = mysql_query('update `' . $this->DB_prefix . 'account` set `amazonAccount`=\'' . mysql_real_escape_string($this->AWSAccountID)
+				. '\' where `accountID`=\'' . mysql_real_escape_string($this->accountID) . '\'', $this->dbConnect())
+			or $this->sqlError('getAccountId', 'store the user\'s amazon account id');
+		}
+		return $this->AWSAccountID;
 	}
 }
 

@@ -19,9 +19,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- *	NOTE: ENTER YOUR API ID AND SECRET KEY BELOW!!!
- *	NOTE: DON'T BE STUPID AND POST YOUR KEY PUBLICALLY, LIKE I AND AT LEAST ONE OTHER PERSON HAS
- *
  */
 
  function ec2Response(&$ec2svc, $text)
@@ -76,8 +73,6 @@ class ec2 {
 		// REQUIRES PEAR PACKAGE
 		// get with "pear install Crypt_HMAC"
 		require_once 'Crypt/HMAC.php';
-		
-//		$this->hasher =& new Crypt_HMAC($this->secretKey, "sha1");
 		
 		// REQUIRES PEAR PACKAGE
 		// get with "pear install --onlyreqdeps HTTP_Request2"
@@ -140,18 +135,18 @@ class ec2 {
 		}
 
 		$signTarget = $verb . "\n" . $this->EC2_HOST . "\n/\n" . $queryString;
-		$this->debug_text("Signing String: ".var_export($signTarget,true));
-		$hasher = new Crypt_HMAC($this->secretKey, "sha1");
+		$this->debug_text('Signing String: '.var_export($signTarget,true));
+		$hasher = new Crypt_HMAC($this->secretKey, 'sha1');
 		$signature = $this->hex2b64($hasher->hash($signTarget));
 		$this->debug_text("Signature: $signature");
 		$queryString .= '&Signature=' . urlencode($signature);
-		$this->debug_text("Query: " . $queryString);
+		$this->debug_text('Query: ' . $queryString);
 						
 		$req =& new HTTP_Request2($this->EC2_METHOD . '://' . $this->EC2_HOST . '/?' . $queryString);
 		$req->setMethod($verb);
 		$resp = $req->send();
 		
-		$this->_responseContentType = $resp->getHeader("Content-Type");
+		$this->_responseContentType = $resp->getHeader('Content-Type');
 		if($this->_responseContentType == '') $this->_responseContentType = 'text/xml';
 		$this->_responseCode = $resp->getStatus();
 		$this->debug_text('code: ' . $this->_responseCode);

@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 -- 
 -- Host: localhost
--- Generation Time: Jul 22, 2009 at 11:08 PM
+-- Generation Time: Aug 02, 2009 at 12:11 AM
 -- Server version: 5.0.27
 -- PHP Version: 5.2.6
 
@@ -24,6 +24,7 @@ CREATE TABLE `account` (
   `descr` varchar(200) default NULL,
   `accessKeyId` char(20) character set ascii collate ascii_bin NOT NULL,
   `secret` char(40) character set ascii collate ascii_bin NOT NULL,
+  `amazonAccount` varchar(20) NOT NULL,
   PRIMARY KEY  (`accountID`)
 ) ENGINE=MyISAM  DEFAULT CHARSET=utf8;
 
@@ -39,7 +40,7 @@ CREATE TABLE `images` (
   `label` varchar(60) default NULL,
   `location` varchar(200) default NULL,
   `descr` mediumtext,
-  `attributes` set('windows','public','paid','amazon','x86_64') default NULL,
+  `attributes` set('windows','public','paid','amazon','x86_64','self','invalid') default NULL,
   `kernelId` varchar(15) default NULL,
   `ramdiskId` varchar(15) default NULL,
   PRIMARY KEY  (`accountID`,`amazonId`),

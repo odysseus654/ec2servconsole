@@ -27,8 +27,8 @@ var DEFAULT_PANE = 'images';
 
 var PANELGROUPS = {
 	defaults: [
-		{ icon: 'shield', name: 'ec2_securityGroups', title: 'Security Groups' },
-		{ icon: 'cd', name: 'ec2_images', title: 'Images' }
+		{ icon: 'images/silk/shield.png', name: 'ec2_securityGroups', title: 'Security Groups' },
+		{ icon: 'images/silk/cd.png', name: 'ec2_images', title: 'Images' }
 	]
 };
 
@@ -36,14 +36,18 @@ var PANELS = {
 	images: {
 		templ: 'images.xslt',
 		url: 'datastore.php',
-		defaults: { panel: 'list' },
+		defaults: { panel: 'list', add: 'addImage' },
 		actions: {
 			list: { params: 'action=images', title: 'Current Machine Images' },
-			sync: { params: 'action=sync', title: 'Operation: db sync' }
+			addImage: { label: 'Add Image', cmd: '<addImage />', title: 'New Image' },
+			detail: { params: 'action=images&id=', title: 'Machine Image Details' }
+		},
+		submitActions: {
+			syncImages: { params: 'action=syncImages' }
 		}
 	},
 	ec2_images: {
-		templ: 'images.xslt',
+		templ: 'ec2-images.xslt',
 		url: 'ec2.php',
 		defaults: { panel: 'list' },
 		actions: {
@@ -800,7 +804,13 @@ function AppPane(panelName, action)
 			var addAction = this.def.actions[this.def.defaults.add];
 			var wrapObj = document.createElement('A');
 			addObj.appendChild(wrapObj);
-			wrapObj.appendChild(document.createTextNode(addAction.label || addAction.title));
+
+			var addIcon = document.createElement('IMG');
+			addIcon.setAttribute('SRC', addAction.icon || 'images/silk/add.png');
+			addIcon.setAttribute('BORDER', '0');
+			addIcon.setAttribute('ALT', addAction.label || addAction.title);
+			addIcon.setAttribute('TITLE', addAction.label || addAction.title);
+			wrapObj.appendChild(addIcon);
 			wrapObj.onclick = this.createClickAction(this.def.defaults.add);
 		}
 	}

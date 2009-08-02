@@ -43,13 +43,13 @@ case 'setproductcode':
 	ec2Response($ec2svc, $ec2svc->setProductCode(arg('id'), arg('code')));
 	break;
 case 'getproductcode':
-	ec2Response($ec2svc, $ec2svc->getProductCode(arg('id')));
+	ec2Response($ec2svc, $ec2svc->describeImageAttribute(arg('id'), 'productCodes'));
 	break;
 case 'modifylaunchpermissions':
 	ec2Response($ec2svc, $ec2svc->modifyLaunchPermissions(arg('id'), arg('op'), arg('user'), arg('group')));
 	break;
 case 'describelaunchpermissions':
-	ec2Response($ec2svc, $ec2svc->describeLaunchPermissions(arg('id')));
+	ec2Response($ec2svc, $ec2svc->describeImageAttribute(arg('id'), 'launchPermission'));
 	break;
 case 'resetlaunchpermissions':
 	ec2Response($ec2svc, $ec2svc->resetLaunchPermissions(arg('id')));
@@ -125,10 +125,78 @@ case 'authintsecgroup':
 case 'revokeintsecgroup':
 	ec2Response($ec2svc, $ec2svc->revokeInternalSecGroupIngress(arg('id'), arg('user'), arg('group')));
 	break;
+case 'describeavailabilityzones':
+	ec2Response($ec2svc, $ec2svc->describeAvailabilityZones(arg('zone')));
+	break;
+case 'describeregions':
+	ec2Response($ec2svc, $ec2svc->describeRegions(arg('region')));
+	break;
+case 'describebundletasks':
+	ec2Response($ec2svc, $ec2svc->describeBundleTasks(arg('id')));
+	break;
+case 'allocateaddress':
+	ec2Response($ec2svc, $ec2svc->allocateAddress());
+	break;
+case 'describeaddresses':
+	ec2Response($ec2svc, $ec2svc->describeAddresses(arg('ip')));
+	break;
+case 'associateaddress':
+	ec2Response($ec2svc, $ec2svc->associateAddress(arg('id'), arg('ip')));
+	break;
+case 'disassociateaddress':
+	ec2Response($ec2svc, $ec2svc->disassociateAddress(arg('ip')));
+	break;
+case 'releaseaddress':
+	ec2Response($ec2svc, $ec2svc->releaseAddress(arg('ip')));
+	break;
+case 'createvolume':
+	ec2Response($ec2svc, $ec2svc->createVolume(arg('size'), arg('zone'), arg('snapid')));
+	break;
+case 'describevolumes':
+	ec2Response($ec2svc, $ec2svc->describeVolumes(arg('volid')));
+	break;
+case 'attachvolume':
+	ec2Response($ec2svc, $ec2svc->attachVolume(arg('instid'), arg('volid'), arg('device')));
+	break;
+case 'detachvolume':
+	ec2Response($ec2svc, $ec2svc->detachVolume(arg('volid'), arg('force'), arg('instid'), arg('device')));
+	break;
+case 'deletevolume':
+	ec2Response($ec2svc, $ec2svc->deleteVolume(arg('volid')));
+	break;
+case 'createsnapshot':
+	ec2Response($ec2svc, $ec2svc->createSnapshot(arg('volid')));
+	break;
+case 'describesnapshots':
+	ec2Response($ec2svc, $ec2svc->describeSnapshots(arg('snapid')));
+	break;
+case 'deletesnapshot':
+	ec2Response($ec2svc, $ec2svc->deleteSnapshot(arg('snapid')));
+	break;
+case 'bundleinstance':
+	ec2Response($ec2svc, $ec2svc->bundleInstance(arg('id'), $ec2svc->keyId, arg('bucket'), arg('prefix'), $ec2svc->secretKey));
+	break;
+case 'cancelbundletask':
+	ec2Response($ec2svc, $ec2svc->cancelBundleTask(arg('taskid')));
+	break;
+case 'describereservedinstancesoffering':
+	ec2Response($ec2svc, $ec2svc->describeReservedInstancesOffering(arg('offid')));
+	break;
+case 'describereservedinstances':
+	ec2Response($ec2svc, $ec2svc->describeReservedInstances(arg('instid')));
+	break;
+case 'purchasereservedinstances':
+	ec2Response($ec2svc, $ec2svc->purchaseReservedInstances(arg('offid')));
+	break;
+case 'monitorinstance':
+	ec2Response($ec2svc, $ec2svc->monitorInstance(arg('id')));
+	break;
+case 'unmonitorinstance':
+	ec2Response($ec2svc, $ec2svc->unmonitorInstance(arg('id')));
+	break;
 default:
 	header('Content-Type: text/xml');
 	echo '<?xml version="1.0" ?>' . "\n";
 	echo '<unknownRequest name="' . arg('action') . '"/>';
 }
-
 ?>

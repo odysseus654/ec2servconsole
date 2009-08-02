@@ -18,8 +18,7 @@
 	See the License for the specific language governing permissions and
 	limitations under the License.
 -->
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-	xmlns:ec2="http://ec2.amazonaws.com/doc/2009-04-04/" version="1.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:ec2="http://ec2.amazonaws.com/doc/2009-04-04/" version="1.0">
 	<xsl:param name="sort" />
 	<xsl:param name="sortdir" />
 	<xsl:param name="action" />
@@ -37,6 +36,8 @@
 		</xsl:choose>
 	</xsl:template>
 	
+	<xsl:template match="ec2:requestId"></xsl:template>
+
 	<!-- Security group list - group list titles -->
 	<xsl:template match="ec2:securityGroupInfo">
 		<table class="securityGroups" width="80%">
@@ -57,11 +58,12 @@
 			<td>
 				<xsl:if test="ec2:groupName != 'default'">
 					<a href="javascript:void(0)" onclick="appDelete(this,'{ec2:groupName} ({ec2:groupDescription})','{ec2:groupName}','deleteGroup');">
-						Del
+						<img src="images/silk/cross.png" border="0" alt="Delete Group" title="Delete Group" />
 					</a>
+					&#160;
 				</xsl:if>
 				<a href="javascript:void(0)" onclick="appPopupAction('addRule', null, '{ec2:groupName}');">
-					Add Rule
+					<img src="images/silk/key_add.png" border="0" alt="Add Rule" title="Add Rule" />
 				</a>
 			</td>
 		</tr>
@@ -102,7 +104,7 @@
 				</td>
 				<td>
 					<a href="javascript:void(0)" onclick="appSubmitAction(this,'delIntRule','id={../../../../ec2:groupName}&amp;user={ec2:userId}&amp;group={ec2:groupName}')">
-						Del
+						<img src="images/silk/cross.png" border="0" alt="Delete Rule" title="Delete Rule" />
 					</a>
 				</td>
 			</tr>
@@ -128,7 +130,7 @@
 			</td>
 			<td>
 					<a href="javascript:void(0)" onclick="appSubmitAction(this,'delExtRule','id={../../../../ec2:groupName}&amp;proto={../../ec2:ipProtocol}&amp;ip={ec2:cidrIp}&amp;from={../../ec2:fromPort}&amp;to={../../ec2:toPort}')">
-						Del
+						<img src="images/silk/cross.png" border="0" alt="Delete Rule" title="Delete Rule" />
 					</a>
 			</td>
 		</tr>
