@@ -52,7 +52,7 @@ function syncImages()
 	
 	// retrieve the list of all public images
 //	$response = $ec2svc->describeImages(null, 'amazon');
-	$response = $ec2svc->describeImages(null, null);
+	$response = $ec2svc->describeImages();
 	if($ec2svc->getResponseCode() != 200)
 	{
 		ec2Response($ec2svc, $response);
@@ -191,6 +191,8 @@ function syncImages()
 				|| (!!stristr($row['attributes'], 'windows') != ($item['platform'] == 'windows')))
 			{
 				$images[$imageId]['status'] = 'modified';
+			} else {
+				$images[$imageId]['status'] = 'unmodified';
 			}
 		} else {
 			$images[$imageId] = array( 'status' => 'deleted' );
@@ -269,6 +271,135 @@ function syncImages()
 	echo '<Response name="' . arg('action') . '">success</Response>';
 }
 
+function syncImage($id, $name = null, $descr = null)
+{
+	global $ec2svc, $session;
+	if($name = '') $name = null;
+	if($descr = '') $descr = null;
+	
+	// retrieve the requested image
+	$response = $ec2svc->describeImages($id);
+	if($ec2svc->getResponseCode() != 200)
+	{
+		ec2Response($ec2svc, $response);
+		return null;
+	}
+	$resptree = xml2php($response);
+	
+	// cleanup and filter the results a bit
+	$items = $resptree['imagesSet']['item'];
+	if(isset($items[0]))
+	{
+		// really shouldn't get here, but let's just pick the first one in the list
+		$item = $items[0];
+	} else {
+		$item = $items;
+	}
+
+	if($value['imageType'] != 'machine')
+	{
+		// trying to sync a non-machine?
+		return null;
+	}
+	
+	$imageId = $item['imageId'];
+	unset($item['imageId']);
+	$item['status'] = '';
+	if($item['isPublic'] == 'false' || $item['imageOwnerId'] == $ownerId) $item['status'] = 'added';
+
+	// check the registered images to make sure they are all still valid
+	$query = mysql_query(
+		'select `amazonID`, `location`, `attributes` from `' . $session->DB_prefix . 'images` where `accountID`=' . quoteOrNull($session->accountID)
+			. ' and `amazonID`=' . quoteOrNull($imageId), $session->dbConnect())
+	or $session->sqlError('syncImage', 'query a requested image');
+
+	if($row = mysql_fetch_assoc($query))
+	{
+		if($item['imageLocation'] != $row['location']
+			|| (!!stristr($row['attributes'], 'x86_64') != ($item['architecture'] == 'x86_64'))
+			|| (!!stristr($row['attributes'], 'amazon') != ($item['imageOwnerId'] == 'amazon'))
+			|| (!!stristr($row['attributes'], 'self') != ($item['imageOwnerId'] == $ownerId))
+			|| (!!stristr($row['attributes'], 'paid') != isset($item['productCodes']))
+			|| (!!stristr($row['attributes'], 'public') != ($item['isPublic'] == 'true'))
+			|| (!!stristr($row['attributes'], 'invalid') != ($item['imageState'] != 'available'))
+			|| (!!stristr($row['attributes'], 'windows') != ($item['platform'] == 'windows')))
+		{
+			$item['status'] = 'modified';
+		} else {
+			$item['status'] = 'unmodified';
+		}
+	}
+	else
+	{
+		$item['status'] = 'added';
+	}
+	mysql_free_result($query) or $session->sqlError('syncImage', 'free query of image');
+
+	$attr = '';
+	if($item['imageOwnerId'] == 'amazon')
+	{
+		if($attr != '') $attr .= ',';
+		$attr .= 'amazon';
+	}
+	else if($item['imageOwnerId'] == $ownerId)
+	{
+		if($attr != '') $attr .= ',';
+		$attr .= 'self';
+	}
+	if(isset($item['productCodes']))
+	{
+		if($attr != '') $attr .= ',';
+		$attr .= 'paid';
+	}
+	if($item['isPublic'] == 'true')
+	{
+		if($attr != '') $attr .= ',';
+		$attr .= 'public';
+	}
+	if(isset($item['plaform']) && $item['platform'] == 'windows')
+	{
+		if($attr != '') $attr .= ',';
+		$attr .= 'windows';
+	}
+	if(isset($item['imageState']) && $item['imageState'] != 'available')
+	{
+		if($attr != '') $attr .= ',';
+		$attr .= 'invalid';
+	}
+	if(isset($item['architecture']) && $item['architecture'] == 'x86_64')
+	{
+		if($attr != '') $attr .= ',';
+		$attr .= 'x86_64';
+	}
+	if(!isset($item['kernelId'])) $item['kernelId'] = null;
+	if(!isset($item['ramdiskId'])) $item['ramdiskId'] = null;
+	
+	$cmd = '';
+	switch($item['status'])
+	{
+		case 'deleted':
+			$cmd = 'delete from `' . $session->DB_prefix . 'images` where `amazonID`=' . quoteOrNull($amazonId) . ' and `accountID`=' . quoteOrNull($session->accountID);
+			break;
+		case 'modified':
+			$cmd = 'update `' . $session->DB_prefix . 'images` set `location`=' . quoteOrNull($item['imageLocation']) .
+				',`attributes`=' . ($attr == '' ? 'null' : quoteOrNull($attr)) .
+				' where `amazonId`=' . quoteOrNull($amazonId) . ' and `accountID`=' . quoteOrNull($session->accountID);
+			break;
+		case 'added':
+			$cmd = 'insert into `' . $session->DB_prefix . 'images`(`amazonID`,`location`,`attributes`,`accountID`,`kernelId`,`ramdiskId`,`name`,`descr`) ' .
+				'values(' . quoteOrNull($amazonId) . ',' . quoteOrNull($item['imageLocation']) . ',' . ($attr == '' ? 'null' : quoteOrNull($attr)) .
+				',' . quoteOrNull($session->accountID) . ',' . quoteOrNull($item['kernelId']) . ',' . quoteOrNull($item['ramdiskId']) .
+				','	. quoteOrNull($name) . ',' . quoteOrNull($descr) . ');';
+			break;
+	}
+	if($cmd != '')
+	{
+		$query = mysql_query($cmd, $session->dbConnect()) or $session->sqlError('syncImage', 'synchronize an image');
+	}
+	
+	return $item;
+}
+
 function listImages($id)
 {
 	global $ec2svc, $session;
@@ -307,6 +438,32 @@ function listImages($id)
 	echo '</ListImagesResponse>';
 }
 
+function addImage($name, $descr, $bucket, $location)
+{
+	global $ec2svc, $session;
+
+	$ec2Location = $location;
+	while(substr($ec2Location,0,1) == '/') $ec2Location = substr($ec2Location,1);
+	if($bucket != null && $bucket != '')
+	{
+		$ec2Location = $bucket . '/' . $ec2Location;
+	}
+
+	$response = $ec2svc->registerImage($ec2Location);
+	if($ec2svc->getResponseCode() != 200)
+	{
+		ec2Response($ec2svc, $response);
+		return null;
+	}
+	$resptree = xml2php($response);
+	$id = $resptree['imageId'];
+	$imageData = syncImage($id, $name, $descr);
+
+	header('Content-Type: text/xml');
+	echo '<?xml version="1.0" ?>' . "\n";
+	echo '<Response name="' . arg('action') . '">success</Response>';
+}
+
 switch(strtolower(arg('action')))
 {
 case 'syncImages':
@@ -314,6 +471,9 @@ case 'syncImages':
 	break;
 case 'images':
 	listImages(arg('id'));
+	break;
+case 'addImage':
+	addImage(arg('name'), arg('descr'), arg('bucket'), arg('location'));
 	break;
 default:
 	header('Content-Type: text/xml');

@@ -19,6 +19,7 @@
 	limitations under the License.
 -->
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:ec2="http://ec2.amazonaws.com/doc/2009-04-04/" version="1.0">
+	<xsl:param name="action" />
 	<xsl:param name="sort" />
 	<xsl:param name="sortdir" />
 	<xsl:param name="pageno" select="'1'" />
@@ -84,7 +85,7 @@
 
 	<xsl:template match="ec2:DescribeImagesResponse">
 		<xsl:choose>
-			<xsl:when test="count(ec2:imagesSet/ec2:item) = 1">
+			<xsl:when test="$action = 'detail'">
 				<xsl:apply-templates select="ec2:imagesSet/ec2:item" mode="singleItem" />
 			</xsl:when>
 			<xsl:otherwise>

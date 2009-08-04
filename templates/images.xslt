@@ -19,6 +19,7 @@
 	limitations under the License.
 -->
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:ds="http://ec2servconsole.sourceforge.net/2009/DataStore" version="1.0">
+	<xsl:param name="action" />
 	<xsl:param name="sort" />
 	<xsl:param name="sortdir" />
 	<xsl:param name="pageno" select="'1'" />
@@ -82,8 +83,11 @@
 	
 	<xsl:template match="ds:ListImagesResponse">
 		<xsl:choose>
-			<xsl:when test="count(ds:image) = 1">
+			<xsl:when test="$action = 'detail'">
 				<xsl:apply-templates select="ds:image" mode="singleItem" />
+			</xsl:when>
+			<xsl:when test="$action = 'deleteImage'">
+				<xsl:apply-templates select="ds:image" mode="deleteItem" />
 			</xsl:when>
 			<xsl:otherwise>
 				<xsl:call-template name="paging">
@@ -184,7 +188,7 @@
 				<td style="wrap: nowrap">
 					<xsl:choose>
 						<xsl:when test="ds:isOwner">
-							<a onclick="appPopupAction('delete', null, '{ds:imageId}')" style="cursor:pointer"><img src="images/silk/cross.png" alt="Delete Image" title="Delete Image" /></a>
+							<a onclick="appPopupAction('deleteImage', null, '{ds:imageId}')" style="cursor:pointer"><img src="images/silk/cross.png" alt="Delete Image" title="Delete Image" /></a>
 						</xsl:when>
 						<xsl:when test="ds:isPublic">
 							<a onclick="appPopupAction('detach', null, '{ds:imageId}')" style="cursor:pointer"><img src="images/silk/delete.png" alt="Remove image from this list" title="Remove image from this list" /></a>
@@ -197,28 +201,98 @@
 	</xsl:template>
 
 	<xsl:template match="ds:image" mode="singleItem">
-		<table>
-			<tr><th>ID</th><td><xsl:value-of select="ds:imageId" /></td></tr>
-			<tr><th>Name</th><td><xsl:value-of select="ds:name" /></td></tr>
-			<tr><th>Description</th><td><xsl:value-of select="ds:descr" /></td></tr>
-			<tr><th>Platform</th><td><xsl:value-of select="ds:platform" /><xsl:text> </xsl:text><xsl:value-of select="ds:architecture" /></td></tr>
-			<tr>
-				<th>Status</th>
-				<td>
-					<xsl:if test="ds:isPublic">public<xsl:text> </xsl:text></xsl:if>
-					<xsl:if test="ds:isPaid">paid<xsl:text> </xsl:text></xsl:if>
-					<xsl:if test="ds:isAmazon">amazon<xsl:text> </xsl:text></xsl:if>
-					<xsl:if test="ds:isOwner">owner<xsl:text> </xsl:text></xsl:if>
-				</td>
-			</tr>
-			<tr><th>Location</th><td><xsl:value-of select="ds:imageLocation" /></td></tr>
-			<xsl:if test="ds:kernelId">
-				<tr><th>Default&#160;Kernel</th><td><xsl:value-of select="ds:kernelId" /></td></tr>
-			</xsl:if>
-			<xsl:if test="ds:ramdiskId">
-				<tr><th>Default&#160;Ramdisk</th><td><xsl:value-of select="ds:ramdiskId" /></td></tr>
-			</xsl:if>
-		</table>
+		<form onsubmit="appSubmitAction(this,'updateImage'); return false;">
+			<input type="hidden" name="id" value="{ds:imageId}" />
+			<table style="white-space:nowrap">
+				<tr><th align="right">ID</th><td><xsl:value-of select="ds:imageId" /></td></tr>
+				<tr><th align="right">Name</th><td><input type="text" name="name" size="20" value="{ds:name}" /></td></tr>
+				<tr><th align="right">Description</th><td><input type="text" name="descr" size="40" value="{ds:descr}" /></td></tr>
+				<tr><th align="right">Platform</th><td><xsl:value-of select="ds:platform" /><xsl:text> </xsl:text><xsl:value-of select="ds:architecture" /></td></tr>
+				<tr>
+					<th align="right">Status</th>
+					<td>
+						<xsl:if test="ds:isPublic">public<xsl:text> </xsl:text></xsl:if>
+						<xsl:if test="ds:isPaid">paid<xsl:text> </xsl:text></xsl:if>
+						<xsl:if test="ds:isAmazon">amazon<xsl:text> </xsl:text></xsl:if>
+						<xsl:if test="ds:isOwner">owner<xsl:text> </xsl:text></xsl:if>
+					</td>
+				</tr>
+				<tr><th align="right">Location</th><td><xsl:value-of select="ds:imageLocation" /></td></tr>
+				<xsl:if test="ds:kernelId">
+					<tr><th align="right">Default&#160;Kernel</th><td><xsl:value-of select="ds:kernelId" /></td></tr>
+				</xsl:if>
+				<xsl:if test="ds:ramdiskId">
+					<tr><th align="right">Default&#160;Ramdisk</th><td><xsl:value-of select="ds:ramdiskId" /></td></tr>
+				</xsl:if>
+				<tr><td colspan="2" align="center">
+					<br />
+					<xsl:if test="ds:isOwner">
+						<button type="button" onclick="appPopupAction('deleteImage', null, '{ds:imageId}')"><img src="images/silk/cross.png" />Delete Image</button>
+					</xsl:if>
+					<button type="submit"><img src="images/silk/disk.png" />Save Changes</button>
+					<button type="button" onclick="ModalWindow.activeWindow(this).destroy()"><img src="images/silk/arrow_undo.png" />Close</button>
+				</td></tr>
+			</table>
+		</form>
+	</xsl:template>
+
+	<xsl:template match="ds:image" mode="deleteItem">
+		<form onsubmit="appSubmitAction(this,'deleteImage'); return false;">
+			<input type="hidden" name="id" value="{ds:imageId}" />
+			<table style="white-space:nowrap">
+				<tr><td align="right" ><img src="images/nuvola/apps_important.png" /></td>
+					<th align="left" colspan="2" valign="bottom">Irreversable Action</th></tr>
+				<tr><td/><td colspan="2" style="white-space:normal">
+						<p>While this will not delete the contents of the image as stored in your S3 bucket,</p>
+						<p>this will permanantly remove the following Amazon Image ID from the system and cause it to be inaccessible to anyone that has been using it.</p>
+						<p>If you later re-add it, it will receive a different Amazon Image ID</p>
+						<hr/>
+					</td></tr>
+				<tr><td/><th align="right">ID</th><td><xsl:value-of select="ds:imageId" /></td></tr>
+				<xsl:if test="ds:name and ds:name != ''">
+					<tr><td/><th align="right">Name</th><td><xsl:value-of select="ds:name" /></td></tr>
+				</xsl:if>
+				<xsl:if test="ds:descr and ds:descr != ''">
+					<tr><td/><th align="right">Description</th><td><xsl:value-of select="ds:descr" /></td></tr>
+				</xsl:if>
+				<tr><td/><th align="right">Location</th><td><xsl:value-of select="ds:imageLocation" /></td></tr>
+				<tr><td colspan="3" align="center">
+					<br />
+					<button type="submit"><img src="images/silk/cross.png" />Proceed</button>
+					<button type="button" onclick="ModalWindow.activeWindow(this).destroy()"><img src="images/silk/arrow_undo.png" />Cancel</button>
+				</td></tr>
+			</table>
+		</form>
+	</xsl:template>
+
+	<!-- Form - add new image -->
+	<xsl:template match="addImage">
+		<form onsubmit="appSubmitAction(this,'addImage'); return false;">
+			<table align="center">
+				<tr>
+					<td>Name</td>
+					<td><input type="text" name="name" size="20" /></td>
+				</tr>
+				<tr>
+					<td>Descr</td>
+					<td><input type="text" name="descr" size="40" /></td>
+				</tr>
+				<tr>
+					<td>S3&#160;Bucket&#160;Name</td>
+					<td><input type="text" name="bucket" size="40" /></td>
+				</tr>
+				<tr>
+					<td><b>Location&#160;within&#160;S3&#160;Bucket</b></td>
+					<td><input type="text" name="location" size="80" /></td>
+				</tr>
+				<tr>
+					<td colspan="2" align="center">
+						<button type="submit"><img src="images/silk/add.png" />Add Image</button>
+						<button type="button" onclick="ModalWindow.activeWindow(this).destroy()"><img src="images/silk/arrow_undo.png" />Cancel</button>
+					</td>
+				</tr>
+			</table>
+		</form>
 	</xsl:template>
 
 </xsl:stylesheet>

@@ -58,12 +58,12 @@
 			<td>
 				<xsl:if test="ec2:groupName != 'default'">
 					<a href="javascript:void(0)" onclick="appDelete(this,'{ec2:groupName} ({ec2:groupDescription})','{ec2:groupName}','deleteGroup');">
-						<img src="images/silk/cross.png" border="0" alt="Delete Group" title="Delete Group" />
+						<img src="images/silk/cross.png" border="0" alt="Delete Group" title="Delete Group" />Del
 					</a>
 					&#160;
 				</xsl:if>
 				<a href="javascript:void(0)" onclick="appPopupAction('addRule', null, '{ec2:groupName}');">
-					<img src="images/silk/key_add.png" border="0" alt="Add Rule" title="Add Rule" />
+					<img src="images/silk/key_add.png" border="0" alt="Add Rule" title="Add Rule" />Add
 				</a>
 			</td>
 		</tr>
@@ -141,17 +141,17 @@
 		<form onsubmit="appSubmitAction(this,'addGroup'); return false;">
 			<table align="center">
 				<tr>
-					<td>Name</td>
+					<td><b>Name</b></td>
 					<td><input type="text" name="name" size="20" /></td>
 				</tr>
 				<tr>
-					<td>Descr</td>
+					<td><b>Descr</b></td>
 					<td><input type="text" name="descr" size="40" /></td>
 				</tr>
 				<tr>
 					<td colspan="2" align="center">
-						<input type="submit" value="Add Group" />
-						<input type="button" value="Cancel" onclick="ModalWindow.activeWindow(this).destroy()" />
+						<button type="submit"><img src="images/silk/add.png" />Add Group</button>
+						<button type="button" onclick="ModalWindow.activeWindow(this).destroy()"><img src="images/silk/arrow_undo.png" />Cancel</button>
 					</td>
 				</tr>
 			</table>
@@ -195,8 +195,8 @@
 					</tr>
 					<tr>
 						<td colspan="2" align="center">
-							<input type="submit" value="Add Rule" />
-							<input type="button" value="Cancel" onclick="ModalWindow.activeWindow(this).destroy()" />
+							<button type="submit"><img src="images/silk/add.png" />Add Rule</button>
+							<button type="button" onclick="ModalWindow.activeWindow(this).destroy()"><img src="images/silk/arrow_undo.png" />Cancel</button>
 						</td>
 					</tr>
 				</table></form>
@@ -223,8 +223,8 @@
 					</tr>
 					<tr>
 						<td colspan="2" align="center">
-							<input type="submit" value="Add Rule" />
-							<input type="button" value="Cancel" onclick="ModalWindow.activeWindow(this).destroy()" />
+							<button type="submit"><img src="images/silk/add.png" />Add Rule</button>
+							<button type="button" onclick="ModalWindow.activeWindow(this).destroy()"><img src="images/silk/arrow_undo.png" />Cancel</button>
 						</td>
 					</tr>
 				</table></form>
@@ -250,8 +250,8 @@
 					</tr>
 					<tr>
 						<td colspan="2" align="center">
-							<input type="submit" value="Add Rule" />
-							<input type="button" value="Cancel" onclick="ModalWindow.activeWindow(this).destroy()" />
+							<button type="submit"><img src="images/silk/add.png" />Add Rule</button>
+							<button type="button" onclick="ModalWindow.activeWindow(this).destroy()"><img src="images/silk/arrow_undo.png" />Cancel</button>
 						</td>
 					</tr>
 				</table></form>

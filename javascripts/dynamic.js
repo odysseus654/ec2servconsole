@@ -511,7 +511,7 @@ TemplateQuery.transform = function(xslt, xml, parms)
 // -----------------------------------------------------------------------------------------------------
 // TransformedAjaxCommand - Retrieve an XSLT query and transform it by a specified command
 
-function TransformedAjaxCommand(xslt, xml, handler)
+function TransformedAjaxCommand(xslt, xml, templParms, handler)
 {
 	Promise.apply(this);
 	if(handler) this.setOnAvail(handler);
@@ -526,12 +526,12 @@ subclass(TransformedAjaxCommand, Promise);
 TransformedAjaxCommand.prototype.xslt = null;
 TransformedAjaxCommand.prototype.xsltSource = null;
 
-TransformedAjaxCommand.prototype.onLoaded = function(xslt, xml)
+TransformedAjaxCommand.prototype.onLoaded = function(xslt, xml, templParms)
 {
 	this.xslt = xslt;
 	if(xml && this.xslt)
 	{
-		this.implSetValue(TemplateQuery.transform(this.xslt, xml));
+		this.implSetValue(TemplateQuery.transform(this.xslt, xml, templParms));
 	} else {
 		this.implSetValue(null);
 	}

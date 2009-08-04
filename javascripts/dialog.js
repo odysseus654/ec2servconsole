@@ -315,14 +315,17 @@ ModalWindow.prototype.prepareContentNode = function(content, useOrig)
 
 // --------------------------------------------------------------------------
 
-function DialogWindow(content, caption)
+function DialogWindow(content, caption, icon)
 {
 	if(caption) this.caption = caption;
+	if(icon) this.icon = icon;
 	ModalWindow.apply(this, arguments);
 }
 DialogWindow.prototype = new ModalWindow();
 DialogWindow.prototype.caption = '';
+DialogWindow.prototype.icon = null;
 DialogWindow.prototype.captionObj = null;
+DialogWindow.prototype.iconObj = null;
 
 DialogWindow.prototype.destroy = function()
 {
@@ -333,6 +336,12 @@ DialogWindow.prototype.destroy = function()
 DialogWindow.prototype.show = function()
 {
 	if(this.captionObj) this.captionObj.nodeValue = this.caption;
+	if(this.iconObj && this.icon)
+	{
+		var img = document.createElement('IMG');
+		img.setAttribute('SRC', this.icon);
+		this.iconObj.appendChild(img);
+	}
 	ModalWindow.prototype.show.apply(this, arguments);
 };
 
@@ -367,6 +376,8 @@ DialogWindow.prototype.constructWrapper = function(content, useOrig)
 
 	var caption = createElem('td', 'dialog-caption', table);
 	var close = createElem('td', 'dialog-close', table);
+	
+	this.iconObj = createElem('span', null, caption);
 	
 	var capText = document.createTextNode('-dummy caption here-');
 	caption.appendChild(capText);

@@ -26,9 +26,10 @@ var CMD_FAILMSG  = '<failed/>';
 var DEFAULT_PANE = 'images';
 
 var PANELGROUPS = {
-	defaults: [
+	defaultGroup: [
 		{ icon: 'images/silk/shield.png', name: 'ec2_securityGroups', title: 'Security Groups' },
-		{ icon: 'images/silk/cd.png', name: 'ec2_images', title: 'Images' }
+		{ icon: 'images/silk/cd.png', name: 'images', title: 'My Images' },
+		{ icon: 'images/silk/cd.png', name: 'ec2_images', title: 'All Images' }
 	]
 };
 
@@ -38,12 +39,14 @@ var PANELS = {
 		url: 'datastore.php',
 		defaults: { panel: 'list', add: 'addImage' },
 		actions: {
-			list: { params: 'action=images', title: 'Current Machine Images' },
-			addImage: { label: 'Add Image', cmd: '<addImage />', title: 'New Image' },
-			detail: { params: 'action=images&id=', title: 'Machine Image Details' }
+			list: { params: 'action=images', title: 'My Images' },
+			addImage: { label: 'Add Image', cmd: '<addImage />', title: 'Register New Image', icon: 'images/silk/add.png' },
+			detail: { params: 'action=images&id=', title: 'Machine Image Details', icon: 'images/silk/magnifier.png' },
+			deleteImage: { params: 'action=images&id=', title: 'Delete Image', icon: 'images/silk/cross.png' }
 		},
 		submitActions: {
-			syncImages: { params: 'action=syncImages' }
+			syncImages: { params: 'action=syncImages' },
+			addImage:   { params: 'action=addImage' }
 		}
 	},
 	ec2_images: {
@@ -52,7 +55,7 @@ var PANELS = {
 		defaults: { panel: 'list' },
 		actions: {
 			list: { params: 'action=DescribeImages', title: 'Available Machine Images' },
-			detail: { params: 'action=DescribeImages&id=', title: 'Machine Image Details' }
+			detail: { params: 'action=DescribeImages&id=', title: 'Machine Image Details', icon: 'images/silk/magnifier.png' }
 //			add: { params: 'action=DescribeImages&id=', templParms: {action: 'addImage'} }
 		}
 	},
@@ -63,10 +66,10 @@ var PANELS = {
 		exclusionStyles: { intMine: ['secInternal', 'secInternalMine'], intTheirs: ['secInternal', 'secInternalTheirs'], ext: ['secExternal'] },
 		actions: {
 			list:		{ params: 'action=DescribeSecurityGroups', title: 'Available Security Groups' },
-			addGroup:	{ label: 'Add Group', cmd: '<addGroup />', title: 'New Security Group' },
+			addGroup:	{ label: 'Add Group', cmd: '<addGroup />', title: 'New Security Group', icon: 'images/silk/add.png' },
 			addRule:	{
-				params: 'action=DescribeSecurityGroups&ignore=', title: 'Add Rule to Security Group', templParms: {action: 'addRule'},
-				onInject: secCheckRuleGrp
+				params: 'action=DescribeSecurityGroups&ignore=', title: 'Add Rule to Security Group', icon: 'images/silk/key_add.png',
+				templParms: {action: 'addRule'}, onInject: secCheckRuleGrp
 			}
 		},
 		submitActions: {
@@ -131,7 +134,7 @@ var ERRORS = {
 // -----------------------------------------------------------------------------------------------------
 // Application-specific version of TransformedAjaxQuery that includes error checking
 
-function AppTransformedAjaxQuery(xslt, req, handler)
+function AppTransformedAjaxQuery(xslt, req, templParms, handler)
 {
 	this.autoRetry = req.autoRetry;
 	this.req = req;
@@ -186,7 +189,7 @@ AppTransformedAjaxQuery.prototype.refresh = function()
 // -----------------------------------------------------------------------------------------------------
 
 var CMD_CACHE = {};
-function retrieveTemplCommand(cmd,templ,handler)
+function retrieveTemplCommand(cmd,templ,parms,handler)
 {
 	if(!templ) templ = APP_SCAFFOLD;
 	if(!CMD_CACHE[templ]) CMD_CACHE[templ] = {};
@@ -212,7 +215,7 @@ function retrieveTemplCommand(cmd,templ,handler)
 		}
 		return null;
 	} else {
-		var query = new TransformedAjaxCommand('templates/' + templ, cmd, function(result)
+		var query = new TransformedAjaxCommand('templates/' + templ, cmd, parms, function(result)
 		{		// store the results of this query before passing control forward
 			if(result)
 			{
@@ -240,7 +243,7 @@ function xlateAndReplace(target, req, templ, callback)
 			target.appendChild(result);
 			if(callback) callback(true);
 		}
-		else retrieveTemplCommand(CMD_FAILMSG, null, function(result)
+		else retrieveTemplCommand(CMD_FAILMSG, null, null, function(result)
 		{
 			if(result)
 			{
@@ -257,7 +260,7 @@ function xlateAndReplace(target, req, templ, callback)
 	}
 	else if(req.cmd)
 	{
-		query = retrieveTemplCommand(req.cmd, templ, catchResults);
+		query = retrieveTemplCommand(req.cmd, templ, req.templParms, catchResults);
 	}
 	else
 	{
@@ -266,7 +269,7 @@ function xlateAndReplace(target, req, templ, callback)
 	}
 	if(query && !query.isComplete)
 	{
-		retrieveTemplCommand(CMD_LOADMSG, null, function(result)
+		retrieveTemplCommand(CMD_LOADMSG, null, null, function(result)
 		{
 			if(result && !query.isComplete)
 			{
@@ -570,6 +573,8 @@ Panel.prototype.xlateAndReplace = function(param, autoRetry)
 		return null;
 	}
 	var self = this;
+
+	req.templParms.action = this.actionName;
 	this.query = xlateAndReplace(this.target, req, this.templ, function(succeeded)
 	{
 		if(succeeded)
@@ -601,6 +606,7 @@ Panel.prototype.rexlateAndReplace = function()
 			templ[key] = this.action.templParms[key];
 		}
 	}
+	templ.action = this.actionName;
 
 	if(!this.target)
 	{
@@ -803,6 +809,7 @@ function AppPane(panelName, action)
 		{
 			var addAction = this.def.actions[this.def.defaults.add];
 			var wrapObj = document.createElement('A');
+			wrapObj.setAttribute('HREF', 'javascript:void(0)');
 			addObj.appendChild(wrapObj);
 
 			var addIcon = document.createElement('IMG');
@@ -811,6 +818,8 @@ function AppPane(panelName, action)
 			addIcon.setAttribute('ALT', addAction.label || addAction.title);
 			addIcon.setAttribute('TITLE', addAction.label || addAction.title);
 			wrapObj.appendChild(addIcon);
+
+			wrapObj.appendChild(document.createTextNode('Add'));
 			wrapObj.onclick = this.createClickAction(this.def.defaults.add);
 		}
 	}
@@ -832,7 +841,7 @@ function PopupPanel(panelName, action, onClose)
 	if(hasError) return null;
 	this.onCloseCallback = onClose;
 
-	var popup = new DialogWindow(null, this.action.title);
+	var popup = new DialogWindow(null, this.action.title, this.action.icon);
 	popup.popupPanel = this;		// let's just sneak this in here, the only DOM reference we make is also one it makes as well
 	popup.hide = this.hookClosePanel();
 	popup.create();
